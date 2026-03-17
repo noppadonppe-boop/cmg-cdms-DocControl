@@ -84,6 +84,8 @@ export interface User {
   photoURL?: string;
   status?: UserStatus;
   requestedAt?: Timestamp;
+  /** Project IDs this user is allowed to access */
+  assignedProjectIds?: string[];
 }
 
 /** Collection: `projects` */

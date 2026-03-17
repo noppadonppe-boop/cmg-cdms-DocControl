@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { FileText, ArrowDownToLine, ArrowUpFromLine, Clock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useProject } from '@/contexts/ProjectContext'
@@ -42,11 +42,13 @@ export default function DashboardPage() {
 
         unsub1 = onSnapshot(
           query(base('transmittals'), where('projectId', '==', pid), orderBy('date', 'desc')),
-          (snap) => setTransmittals(snap.docs.map((d) => ({ transmittalId: d.id, ...d.data() } as Transmittal)))
+          (snap) => setTransmittals(snap.docs.map((d) => ({ transmittalId: d.id, ...d.data() } as Transmittal))),
+          (err) => console.error('[Dashboard/transmittals] onSnapshot error:', err.code, err.message)
         )
         unsub2 = onSnapshot(
           query(base('documents'), where('projectId', '==', pid)),
-          (snap) => setDocuments(snap.docs.map((d) => ({ documentId: d.id, ...d.data() } as Document)))
+          (snap) => setDocuments(snap.docs.map((d) => ({ documentId: d.id, ...d.data() } as Document))),
+          (err) => console.error('[Dashboard/documents] onSnapshot error:', err.code, err.message)
         )
       }
     )
@@ -69,7 +71,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-sm text-gray-500 mt-1">
@@ -77,7 +78,6 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {STATS.map(({ label, value, icon: Icon, color, bg }) => (
           <Card key={label} className="border border-gray-200 shadow-sm">
@@ -94,7 +94,6 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Recent Transmittals */}
       <Card className="border border-gray-200 shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold text-gray-800">Recent Transmittals</CardTitle>

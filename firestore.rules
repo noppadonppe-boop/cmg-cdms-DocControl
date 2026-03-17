@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: is the request from a signed-in user?
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Helper: read the caller's user doc
+    function userDoc() {
+      return get(/databases/$(database)/documents/CMG-cdms-DocControl/root/users/$(request.auth.uid));
+    }
+
+    function userExists() {
+      return exists(/databases/$(database)/documents/CMG-cdms-DocControl/root/users/$(request.auth.uid));
+    }
+
+    function userRole() {
+      return userExists() ? userDoc().data.role : 'Viewer';
+    }
+
+    function userStatus() {
+      return userExists() ? (userDoc().data.keys().hasAll(['status']) ? userDoc().data.status : 'active') : 'pending';
+    }
+
+    function isActive() {
+      return userStatus() == 'active';
+    }
+
+    function isMasterAdmin() {
+      return isAuth() && userRole() == 'MasterAdmin';
+    }
+
+    function isAdminOrAbove() {
+      return isAuth() && userRole() in ['MasterAdmin', 'Admin'];
+    }
+
+    function isManagerOrAbove() {
+      return isAuth() && userRole() in ['MasterAdmin', 'Admin', 'Manager'];
+    }
+
+    function canWrite() {
+      return isAuth() && (isAdminOrAbove() || isActive());
+    }
+
+    // ── Root document (public readable so context can bootstrap) ──
+    match /CMG-cdms-DocControl/root {
+      allow read, write: if isAuth();
+    }
+
+    // ── Users ──
+    match /CMG-cdms-DocControl/root/users/{uid} {
+      // Any authenticated active user can read any profile (needed for lock banners etc.)
+      allow read: if isAuth();
+      // Users can write their own doc; MasterAdmin can write any
+      allow write: if isAuth() && (request.auth.uid == uid || isMasterAdmin());
+    }
+
+    // ── Projects ──
+    match /CMG-cdms-DocControl/root/projects/{projectId} {
+      allow read: if isAuth();
+      allow create, update, delete: if isManagerOrAbove();
+    }
+
+    // ── Transmittals ──
+    match /CMG-cdms-DocControl/root/transmittals/{docId} {
+      allow read: if isAuth();
+      allow create: if canWrite();
+      allow update, delete: if isAdminOrAbove();
+    }
+
+    // ── Documents ──
+    match /CMG-cdms-DocControl/root/documents/{docId} {
+      allow read: if isAuth();
+      allow create: if canWrite();
+      allow update, delete: if isAdminOrAbove();
+    }
+
+    // ── Document History (append-only audit log) ──
+    match /CMG-cdms-DocControl/root/document_history/{docId} {
+      allow read: if isAuth();
+      allow create: if canWrite();
+      allow update, delete: if false;
+    }
+
+    // ── Edit locks ──
+    match /CMG-cdms-DocControl/root/{lockCollection}/{lockId} {
+      allow read, write, delete: if isAuth();
+    }
+  }
+}

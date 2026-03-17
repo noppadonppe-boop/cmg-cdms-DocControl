@@ -7,6 +7,7 @@ const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 interface ProjectContextValue {
   availableProjects: Project[]
+  allProjects: Project[]
   selectedProject: Project | null
   changeSelectedProject: (projectId: string) => void
   loadingProjects: boolean
@@ -14,6 +15,7 @@ interface ProjectContextValue {
 
 const ProjectContext = createContext<ProjectContextValue>({
   availableProjects: [],
+  allProjects: [],
   selectedProject: null,
   changeSelectedProject: () => {},
   loadingProjects: true,
@@ -24,6 +26,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
   const [availableProjects, setAvailableProjects] = useState<Project[]>(
     USE_MOCK ? mockProjects.filter((p) => p.memberIds.includes(MOCK_UID.alice)) : []
+  )
+  const [allProjects, setAllProjects] = useState<Project[]>(
+    USE_MOCK ? mockProjects : []
   )
   const [selectedProject, setSelectedProject] = useState<Project | null>(
     USE_MOCK ? mockProjects[0] ?? null : null
@@ -40,8 +45,42 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    let unsubscribe: (() => void) | undefined
+    const uid = currentUser.uid
+
+    let unsubProjects: (() => void) | undefined
+    let unsubUser: (() => void) | undefined
     let cancelled = false
+
+    // Shared cache — updated by whichever listener fires first
+    let cachedProjects: Project[] = []
+    let cachedRole = 'Viewer'
+    let cachedAssigned: string[] | null = null  // null = never set; [] = set but empty
+
+    function applyFilter() {
+      let projects: Project[]
+      if (cachedRole === 'MasterAdmin' || cachedRole === 'Admin') {
+        projects = cachedProjects
+      } else if (cachedAssigned !== null) {
+        // assignedProjectIds was explicitly set — honour it (even if empty)
+        projects = cachedProjects.filter((p) => cachedAssigned!.includes(p.projectId))
+      } else {
+        // Never configured — fall back to memberIds for backward compat
+        const byMember = cachedProjects.filter((p) =>
+          Array.isArray(p.memberIds) && p.memberIds.includes(uid)
+        )
+        projects = byMember.length > 0 ? byMember : cachedProjects
+      }
+
+      setAvailableProjects(projects)
+      setSelectedProject((prev) => {
+        if (prev) {
+          const stillExists = projects.find((p) => p.projectId === prev.projectId)
+          return stillExists ?? projects[0] ?? null
+        }
+        return projects[0] ?? null
+      })
+      setLoadingProjects(false)
+    }
 
     Promise.all([
       import('firebase/firestore'),
@@ -49,51 +88,36 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     ]).then(([{ collection, doc, onSnapshot }, { db }]) => {
       if (cancelled) return
 
-      // Fetch user role first, then decide which projects to show
       const userDocRef = doc(db, 'CMG-cdms-DocControl', 'root', 'users', currentUser.uid)
       const projectsColRef = collection(db, 'CMG-cdms-DocControl', 'root', 'projects')
 
-      // Listen to all projects (MasterAdmin/Admin see all; others filtered client-side)
-      unsubscribe = onSnapshot(projectsColRef, async (snapshot) => {
-        const allProjects = snapshot.docs.map((d) => ({
+      // Listener 1: user doc — updates role + assignedProjectIds reactively
+      unsubUser = onSnapshot(userDocRef, (userSnap) => {
+        if (cancelled) return
+        if (userSnap.exists()) {
+          const data = userSnap.data()
+          cachedRole = data.role ?? 'Viewer'
+          cachedAssigned = Array.isArray(data.assignedProjectIds) ? data.assignedProjectIds : null
+        }
+        applyFilter()
+      })
+
+      // Listener 2: projects collection
+      unsubProjects = onSnapshot(projectsColRef, (snapshot) => {
+        if (cancelled) return
+        cachedProjects = snapshot.docs.map((d) => ({
           projectId: d.id,
           ...d.data(),
         })) as Project[]
-
-        // Read user role to decide filter
-        let role = 'Viewer'
-        try {
-          const { getDoc } = await import('firebase/firestore')
-          const userSnap = await getDoc(userDocRef)
-          if (userSnap.exists()) role = userSnap.data().role ?? 'Viewer'
-        } catch { /* ignore */ }
-
-        let projects: Project[]
-        if (role === 'MasterAdmin' || role === 'Admin') {
-          projects = allProjects
-        } else {
-          const mine = allProjects.filter((p) =>
-            Array.isArray(p.memberIds) && p.memberIds.includes(currentUser.uid)
-          )
-          // Fallback: if user has no memberships yet, show all so they can at least see the app
-          projects = mine.length > 0 ? mine : allProjects
-        }
-
-        setAvailableProjects(projects)
-        setSelectedProject((prev) => {
-          if (prev) {
-            const stillExists = projects.find((p) => p.projectId === prev.projectId)
-            return stillExists ?? projects[0] ?? null
-          }
-          return projects[0] ?? null
-        })
-        setLoadingProjects(false)
+        setAllProjects(cachedProjects)
+        applyFilter()
       })
     })
 
     return () => {
       cancelled = true
-      unsubscribe?.()
+      unsubProjects?.()
+      unsubUser?.()
     }
   }, [currentUser])
 
@@ -104,7 +128,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ProjectContext.Provider
-      value={{ availableProjects, selectedProject, changeSelectedProject, loadingProjects }}
+      value={{ availableProjects, allProjects, selectedProject, changeSelectedProject, loadingProjects }}
     >
       {children}
     </ProjectContext.Provider>

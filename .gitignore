@@ -15,6 +15,9 @@ dist-ssr
 # Firebase Admin credentials (NEVER commit this file)
 serviceAccountKey.json
 
+# Firebase CLI cache (hosting upload cache — can be very large)
+.firebase/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "cmg-cdms-doccontrol"
+  },
+  "targets": {
+    "cmg-cdms-doccontrol": {
+      "hosting": {
+        "site-01": [
+          "cmg-cdms-doccontrol"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

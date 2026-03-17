@@ -12,13 +12,12 @@ import {
   X,
   Building2,
   Layers,
-  Users,
   UserCog,
+  Users,
 } from 'lucide-react'
 import { useProject } from '@/contexts/ProjectContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useUser, ROLE_MODULES } from '@/contexts/UserContext'
-import UserManagementPanel from '@/components/UserManagementPanel'
 
 const NAV_MAIN = [
   { to: '/dashboard',      label: 'Dashboard',         icon: LayoutDashboard, module: 'dashboard' },
@@ -30,6 +29,7 @@ const NAV_MAIN = [
 const NAV_ADMIN = [
   { to: '/projects',  label: 'Projects',  icon: Layers,    module: 'projects' },
   { to: '/settings',  label: 'Settings',  icon: Settings,  module: 'settings' },
+  { to: '/users',     label: 'Users',     icon: Users,     module: 'users' },
 ]
 
 const ROLE_COLORS: Record<string, string> = {
@@ -44,7 +44,6 @@ export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false)
   const [userDropdownOpen, setUserDropdownOpen] = useState(false)
-  const [userPanelOpen, setUserPanelOpen] = useState(false)
   const [updatingProfile, setUpdatingProfile] = useState(false)
   const projectDropdownRef = useRef<HTMLDivElement>(null)
   const userDropdownRef = useRef<HTMLDivElement>(null)
@@ -195,8 +194,24 @@ export default function MainLayout() {
                       }
                       title={!sidebarOpen ? label : undefined}
                     >
-                      <Icon size={18} className="shrink-0" />
-                      {sidebarOpen && <span className="truncate">{label}</span>}
+                      <div className="relative shrink-0">
+                        <Icon size={18} />
+                        {to === '/users' && isMasterAdmin && pendingCount > 0 && !sidebarOpen && (
+                          <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center">
+                            {pendingCount > 9 ? '9+' : pendingCount}
+                          </span>
+                        )}
+                      </div>
+                      {sidebarOpen && (
+                        <>
+                          <span className="truncate flex-1">{label}</span>
+                          {to === '/users' && isMasterAdmin && pendingCount > 0 && (
+                            <span className="ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-500 text-white">
+                              {pendingCount}
+                            </span>
+                          )}
+                        </>
+                      )}
                     </NavLink>
                   </li>
                 ))}
@@ -204,36 +219,6 @@ export default function MainLayout() {
             </div>
           )}
         </nav>
-
-        {/* ── Sidebar Bottom: User Management (MasterAdmin only) ── */}
-        {isMasterAdmin && (
-          <div className="px-2 pb-2 shrink-0 border-t border-slate-700 pt-2">
-            <button
-              onClick={() => setUserPanelOpen(true)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors relative"
-              title={!sidebarOpen ? 'User Management' : undefined}
-            >
-              <div className="relative shrink-0">
-                <Users size={18} />
-                {pendingCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center">
-                    {pendingCount > 9 ? '9+' : pendingCount}
-                  </span>
-                )}
-              </div>
-              {sidebarOpen && (
-                <>
-                  <span className="truncate flex-1">User Management</span>
-                  {pendingCount > 0 && (
-                    <span className="ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-500 text-white">
-                      {pendingCount}
-                    </span>
-                  )}
-                </>
-              )}
-            </button>
-          </div>
-        )}
 
         {/* Sidebar Footer */}
         {sidebarOpen && (
@@ -372,8 +357,6 @@ export default function MainLayout() {
         </main>
       </div>
 
-      {/* ── User Management Slide-in Panel ── */}
-      <UserManagementPanel open={userPanelOpen} onClose={() => setUserPanelOpen(false)} />
     </div>
   )
 }

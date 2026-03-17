@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Building2, Loader2, Eye, EyeOff } from 'lucide-react'
+import { Building2, Loader2, Eye, EyeOff, Clock } from 'lucide-react'
 
 function GoogleIcon() {
   return (
@@ -19,17 +19,44 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [statusError, setStatusError] = useState<'pending' | 'disabled' | null>(null)
+
+  async function checkUserStatus(uid: string): Promise<'active' | 'pending' | 'disabled' | 'unknown'> {
+    try {
+      const [{ doc, getDoc }, { db }] = await Promise.all([
+        import('firebase/firestore'),
+        import('@/services/firebase'),
+      ])
+      const snap = await getDoc(doc(db, 'CMG-cdms-DocControl', 'root', 'users', uid))
+      if (!snap.exists()) return 'pending'
+      return (snap.data().status ?? 'active') as 'active' | 'pending' | 'disabled'
+    } catch {
+      return 'unknown'
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    setStatusError(null)
     setLoading(true)
     try {
-      const [{ signInWithEmailAndPassword }, { auth }] = await Promise.all([
+      const [{ signInWithEmailAndPassword, signOut }, { auth }] = await Promise.all([
         import('firebase/auth'),
         import('@/services/firebase'),
       ])
-      await signInWithEmailAndPassword(auth, email, password)
+      const cred = await signInWithEmailAndPassword(auth, email, password)
+      const status = await checkUserStatus(cred.user.uid)
+      if (status === 'pending') {
+        await signOut(auth)
+        setStatusError('pending')
+        return
+      }
+      if (status === 'disabled') {
+        await signOut(auth)
+        setStatusError('disabled')
+        return
+      }
     } catch (err: unknown) {
       const code = (err as { code?: string }).code
       console.error('[Login Error]', code, err)
@@ -49,15 +76,27 @@ export default function LoginPage() {
 
   async function handleGoogleSignIn() {
     setError(null)
+    setStatusError(null)
     setGoogleLoading(true)
     try {
-      const [{ GoogleAuthProvider, signInWithPopup }, { auth }] = await Promise.all([
+      const [{ GoogleAuthProvider, signInWithPopup, signOut }, { auth }] = await Promise.all([
         import('firebase/auth'),
         import('@/services/firebase'),
       ])
       const provider = new GoogleAuthProvider()
       provider.setCustomParameters({ prompt: 'select_account' })
-      await signInWithPopup(auth, provider)
+      const cred = await signInWithPopup(auth, provider)
+      const status = await checkUserStatus(cred.user.uid)
+      if (status === 'pending') {
+        await signOut(auth)
+        setStatusError('pending')
+        return
+      }
+      if (status === 'disabled') {
+        await signOut(auth)
+        setStatusError('disabled')
+        return
+      }
     } catch (err: unknown) {
       const code = (err as { code?: string }).code
       console.error('[Google Login Error]', code, err)
@@ -92,6 +131,23 @@ export default function LoginPage() {
           <h2 className="text-lg font-semibold text-gray-800 mb-1">Sign in</h2>
           <p className="text-sm text-gray-400 mb-5">Enter your credentials to continue</p>
 
+          {statusError === 'pending' && (
+            <div className="mb-4 px-4 py-3 rounded-lg bg-orange-50 border border-orange-200">
+              <div className="flex items-start gap-2.5">
+                <Clock size={16} className="text-orange-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-orange-800">Account Pending Approval</p>
+                  <p className="text-xs text-orange-600 mt-0.5">Your account is awaiting administrator approval. You will be notified once access is granted.</p>
+                </div>
+              </div>
+            </div>
+          )}
+          {statusError === 'disabled' && (
+            <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200">
+              <p className="text-sm font-semibold text-red-700">Account Disabled</p>
+              <p className="text-xs text-red-600 mt-0.5">Your account has been disabled. Please contact an administrator.</p>
+            </div>
+          )}
           {error && (
             <div className="mb-4 px-3 py-2.5 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">
               {error}

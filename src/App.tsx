@@ -12,6 +12,7 @@ import TransmittalOutPage from '@/pages/TransmittalOutPage'
 import DocumentRegisterPage from '@/pages/DocumentRegisterPage'
 import SettingsPage from '@/pages/SettingsPage'
 import ProjectManagementPage from '@/pages/ProjectManagementPage'
+import UserManagementPage from '@/pages/UserManagementPage'
 import ErrorBoundary from '@/components/ErrorBoundary'
 
 function App() {
@@ -31,6 +32,7 @@ function App() {
                 <Route path="/documents" element={<ErrorBoundary><DocumentRegisterPage /></ErrorBoundary>} />
                 <Route path="/projects" element={<ErrorBoundary><ProjectManagementPage /></ErrorBoundary>} />
                 <Route path="/settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />
+                <Route path="/users" element={<ErrorBoundary><UserManagementPage /></ErrorBoundary>} />
               </Route>
             </Route>
           </Routes>

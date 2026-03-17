@@ -74,7 +74,8 @@ export default function TransmittalInPage() {
             where('type', '==', 'in'),
             orderBy('date', 'desc')
           ),
-          (snap) => setAllData(snap.docs.map((d) => ({ transmittalId: d.id, ...d.data() } as Transmittal)))
+          (snap) => setAllData(snap.docs.map((d) => ({ transmittalId: d.id, ...d.data() } as Transmittal))),
+          (err) => console.error('[TransmittalIn] onSnapshot error:', err.code, err.message)
         )
       }
     )

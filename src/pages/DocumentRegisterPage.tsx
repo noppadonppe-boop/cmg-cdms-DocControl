@@ -87,7 +87,8 @@ export default function DocumentRegisterPage() {
             collection(db, 'CMG-cdms-DocControl', 'root', 'documents'),
             where('projectId', '==', selectedProject.projectId)
           ),
-          (snap) => setAllDocs(snap.docs.map((d) => ({ documentId: d.id, ...d.data() } as Document)))
+          (snap) => setAllDocs(snap.docs.map((d) => ({ documentId: d.id, ...d.data() } as Document))),
+          (err) => console.error('[Documents] onSnapshot error:', err.code, err.message)
         )
       }
     )
