@@ -2,7 +2,7 @@ import { useState } from 'react'
 import {
   BookOpen, ChevronRight, Info, Users, LogIn, LayoutDashboard,
   ArrowDownToLine, ArrowUpFromLine, FolderOpen, Layers, UserCog,
-  Lock, Tag, GitBranch, AlertCircle,
+  Lock, Tag, GitBranch, AlertCircle, ListChecks,
 } from 'lucide-react'
 
 interface Section {
@@ -25,6 +25,7 @@ const SECTIONS: Section[] = [
   { id: 'statuscode',     title: '11. Status Code',                 icon: Tag },
   { id: 'workflow',       title: '12. Workflow ภาพรวม',             icon: GitBranch },
   { id: 'troubleshoot',   title: '13. การแก้ปัญหาเบื้องต้น',        icon: AlertCircle },
+  { id: 'workflow-detail', title: '14. Workflow โดยละเอียด',           icon: ListChecks },
 ]
 
 function SectionTitle({ id, children }: { id: string; children: React.ReactNode }) {
@@ -533,6 +534,149 @@ export default function UserManualPage() {
             <tr><Td>ไม่เห็นโครงการ</Td><Td>ติดต่อ MasterAdmin เพื่อกำหนด Assigned Projects</Td></tr>
             <tr><Td>Google Popup ถูก Block</Td><Td>อนุญาต Popup ใน Browser Settings</Td></tr>
             <tr><Td>ไฟล์แนบไม่อัพโหลด</Td><Td>ตรวจสอบขนาดไฟล์ (สูงสุด 50 MB ต่อไฟล์)</Td></tr>
+          </tbody>
+        </TableWrapper>
+
+        {/* ════════════════════════════════════════ */}
+        {/* SECTION 14: Workflow โดยละเอียด */}
+        {/* ════════════════════════════════════════ */}
+        <SectionTitle id="workflow-detail"><ListChecks size={18} className="text-indigo-600" /> Workflow โดยละเอียด — ทุกกระบวนการ</SectionTitle>
+
+        <InfoBox>
+          <strong>สัญลักษณ์ Role:</strong>{' '}
+          🔴 MasterAdmin &nbsp;|&nbsp; 🔵 Admin &nbsp;|&nbsp; 🟢 Manager &nbsp;|&nbsp; 🟡 Engineer &nbsp;|&nbsp; ⚪ Viewer (ดูได้อย่างเดียว)
+        </InfoBox>
+
+        <SubTitle>16.1 User Onboarding (เข้าร่วมระบบครั้งแรก)</SubTitle>
+        <p className="text-sm text-gray-600 mb-2">ผู้เกี่ยวข้อง: ผู้ใช้ใหม่ + 🔴 MasterAdmin</p>
+        <div className="space-y-2">
+          <Step n={1}><strong>ผู้ใช้ใหม่</strong> — เปิด URL แล้ว Sign in ด้วย Google หรือ Email ระบบสร้าง User Document อัตโนมัติ: <code>status: &quot;pending&quot;, role: &quot;Viewer&quot;</code></Step>
+          <Step n={2}><strong>ผู้ใช้ใหม่</strong> — เห็นหน้า &quot;Pending Approval&quot; ยังเข้าระบบไม่ได้</Step>
+          <Step n={3}><strong>🔴 MasterAdmin</strong> — เห็น Badge สีส้มใน Sidebar → เข้า /users → เลือก Role → กำหนดโครงการ → กด <strong>Approve</strong></Step>
+          <Step n={4}><strong>ระบบ</strong> — อัพเดท <code>status: &quot;active&quot;</code> ผู้ใช้ใหม่เข้าระบบได้ทันที (Real-time)</Step>
+        </div>
+
+        <SubTitle>16.2 สร้างโครงการใหม่ (Create Project)</SubTitle>
+        <p className="text-sm text-gray-600 mb-2">ผู้เกี่ยวข้อง: 🔴🔵🟢</p>
+        <div className="space-y-2">
+          <Step n={1}><strong>🔴🔵🟢</strong> — เข้า Project Management → กรอก Project Name (บังคับ 3-100 ตัว) + Description → กด <strong>Create Project</strong></Step>
+          <Step n={2}><strong>ระบบ</strong> — ตรวจ Edit Lock → บันทึก Firestore พร้อม <code>memberIds, roles, createdAt</code></Step>
+          <Step n={3}><strong>ระบบ</strong> — Project ปรากฏในรายการและ Top Bar Selector ทันที</Step>
+          <Step n={4}><strong>🔴 MasterAdmin</strong> — เข้า User Management กำหนดโครงการใหม่ให้ User ที่เกี่ยวข้อง</Step>
+        </div>
+
+        <SubTitle>16.3 รับเอกสาร (Transmittal In)</SubTitle>
+        <p className="text-sm text-gray-600 mb-2">ผู้เกี่ยวข้อง: 🔵🟢🟡</p>
+        <div className="space-y-2">
+          <Step n={1}><strong>🔵🟢🟡</strong> — ได้รับเอกสารจากภายนอก → เข้า Transmittal In → กด &quot;+ New Transmittal&quot;</Step>
+          <Step n={2}><strong>🔵🟢🟡</strong> — กรอก Transmittal No.*, Sender*, Subject*, Purpose, Status, Date แนบไฟล์ PDF</Step>
+          <Step n={3}><strong>ระบบ</strong> — บันทึก <code>requiresReply = true</code> (For Approval/Action) → ปรากฏในตาราง Real-time → Dashboard &quot;Pending Reply&quot; เพิ่มขึ้น</Step>
+          <Step n={4}><strong>🔵🟢</strong> — คลิก Link ไฟล์ดาวน์โหลด หรือกด ✉️ ส่ง Forward ทางอีเมล</Step>
+        </div>
+
+        <SubTitle>16.4 ส่งเอกสาร (Transmittal Out)</SubTitle>
+        <p className="text-sm text-gray-600 mb-2">ผู้เกี่ยวข้อง: 🔵🟢🟡</p>
+        <div className="space-y-2">
+          <Step n={1}><strong>🟡🟢</strong> — เตรียมไฟล์ PDF → เข้า Transmittal Out → กด &quot;+ New Transmittal&quot;</Step>
+          <Step n={2}><strong>🟡🟢</strong> — กรอก Transmittal No.*, Sender*, Recipient, Subject*, Purpose (For Approval/Action/Information/Record), Date แนบไฟล์</Step>
+          <Step n={3}><strong>ระบบ</strong> — บันทึก <code>requiresReply = true</code> (For Approval/Action) → ปรากฏในตาราง Real-time</Step>
+          <Step n={4}><strong>🟡🟢</strong> — กด ✉️ เพื่อ copy ข้อมูลส่งทางอีเมลพร้อม Link ไฟล์</Step>
+        </div>
+
+        <SubTitle>16.5 บันทึกเอกสาร (Add Document)</SubTitle>
+        <p className="text-sm text-gray-600 mb-2">ผู้เกี่ยวข้อง: 🔵🟢🟡</p>
+        <div className="space-y-2">
+          <Step n={1}><strong>🟡 Engineer</strong> — เข้า Document Register → กด &quot;+ Add Document&quot;</Step>
+          <Step n={2}><strong>🟡</strong> — กรอก Document No.*, Revision (Rev.00), Title*, Category, Status, Transmittal ID (ไม่บังคับ) แนบไฟล์</Step>
+          <Step n={3}><strong>ระบบ</strong> — บันทึก <code>isLatest: true</code> → ปรากฏในตาราง Real-time → Dashboard &quot;Total Documents&quot; เพิ่มขึ้น</Step>
+        </div>
+
+        <SubTitle>16.6 ตรวจสอบและอนุมัติเอกสาร (Review &amp; Approve)</SubTitle>
+        <p className="text-sm text-gray-600 mb-2">ผู้เกี่ยวข้อง: 🟡 Engineer → 🔵🟢 Admin/Manager → Client</p>
+        <div className="space-y-2">
+          <Step n={1}><strong>🟡 Engineer</strong> — บันทึก Document Rev.00 → สร้าง Transmittal Out, purpose: &quot;For Approval&quot; → แนบไฟล์ → ส่งให้ผู้ตรวจสอบ</Step>
+          <Step n={2}><strong>Client/ผู้ตรวจสอบ</strong> — รับเอกสาร ตรวจสอบ ส่งคำตอบกลับพร้อม Status Code A/B/C/D</Step>
+          <Step n={3}><strong>🔵🟢</strong> — สร้าง Transmittal In (บันทึก Reply) แนบไฟล์คำตอบ</Step>
+          <Step n={4}><strong>🔵🟢</strong> — เปิด Document Register อัพเดท Status Code:</Step>
+        </div>
+        <TableWrapper>
+          <thead><tr><Th>Code</Th><Th>ความหมาย</Th><Th>ผล</Th></tr></thead>
+          <tbody>
+            <tr><Td><span className="font-bold text-green-700">A</span></Td><Td>Approved</Td><Td>Document → Approved, Transmittal → Closed</Td></tr>
+            <tr><Td><span className="font-bold text-teal-700">B</span></Td><Td>Approved as Noted</Td><Td>Document → Approved as Noted, Transmittal → Closed</Td></tr>
+            <tr><Td><span className="font-bold text-red-700">C</span></Td><Td>Revise &amp; Resubmit</Td><Td>Rev.00 → Superseded, สร้าง Rev.01 ใหม่ วนกลับขั้นที่ 1</Td></tr>
+            <tr><Td><span className="font-bold text-red-900">D</span></Td><Td>Rejected</Td><Td>Document → Rejected, จบ Workflow</Td></tr>
+          </tbody>
+        </TableWrapper>
+
+        <SubTitle>16.7 แก้ไขและส่งเอกสารใหม่ (Revision Cycle — Code C)</SubTitle>
+        <p className="text-sm text-gray-600 mb-2">ผู้เกี่ยวข้อง: 🔵🟢 Admin/Manager → 🟡 Engineer</p>
+        <div className="space-y-2">
+          <Step n={1}><strong>🔵🟢</strong> — รับ Code C → บันทึก Transmittal In → อัพเดท Document: <code>statusCode=&quot;C&quot;, status=&quot;Revise and Resubmit&quot;, isLatest=false</code></Step>
+          <Step n={2}><strong>🔵🟢</strong> — สร้าง Document ใหม่: documentNo เดิม, revision=Rev.01, status=&quot;Submitted&quot;, isLatest=true</Step>
+          <Step n={3}><strong>🟡 Engineer</strong> — แก้ไขเอกสารตาม Comment → อัพโหลดไฟล์ใหม่ (Rev.01)</Step>
+          <Step n={4}><strong>🟡 Engineer</strong> — สร้าง Transmittal Out ใหม่ แนบ Rev.01 → วนกลับขั้นตอน 16.6</Step>
+          <Step n={5}>ทำซ้ำจนได้ Code A หรือ B → <strong>Document Approved</strong></Step>
+        </div>
+
+        <SubTitle>16.8 ปิด Transmittal (Close)</SubTitle>
+        <p className="text-sm text-gray-600 mb-2">ผู้เกี่ยวข้อง: 🔵🟢</p>
+        <div className="space-y-2">
+          <Step n={1}><strong>🔵🟢</strong> — เข้าตาราง Transmittal In/Out → ค้นหา Transmittal → อัพเดท Status เป็น &quot;Closed&quot;</Step>
+          <Step n={2}><strong>ระบบ</strong> — Badge เปลี่ยนเป็น &quot;Closed&quot; (สีเขียว) → Dashboard &quot;Pending Reply&quot; ลดลง</Step>
+        </div>
+        <WarnBox>Transmittal จะหายจาก &quot;Pending Reply&quot; เมื่อ <code>requiresReply=true AND status=&quot;Closed&quot;</code></WarnBox>
+
+        <SubTitle>16.9 แก้ไขโครงการ (Edit Project)</SubTitle>
+        <p className="text-sm text-gray-600 mb-2">ผู้เกี่ยวข้อง: 🔴🔵🟢</p>
+        <div className="space-y-2">
+          <Step n={1}><strong>🔴🔵🟢</strong> — Hover บน Project Card → กดปุ่ม ✏️ (Pencil)</Step>
+          <Step n={2}><strong>ระบบ</strong> — ฟอร์มเปลี่ยนเป็น &quot;Edit Project&quot; (สีส้ม) พร้อม pre-fill ข้อมูลเดิม</Step>
+          <Step n={3}><strong>🔴🔵🟢</strong> — แก้ไข Name/Description → กด &quot;Save Changes&quot;</Step>
+          <Step n={4}><strong>ระบบ</strong> — <code>updateDoc</code> → Card อัพเดททันที กด &quot;Cancel&quot; ได้ตลอดเวลาเพื่อยกเลิก</Step>
+        </div>
+
+        <SubTitle>16.10 ลบโครงการ (Delete Project)</SubTitle>
+        <p className="text-sm text-gray-600 mb-2">ผู้เกี่ยวข้อง: 🔴🔵🟢</p>
+        <div className="space-y-2">
+          <Step n={1}><strong>🔴🔵🟢</strong> — Hover บน Project Card → กดปุ่ม 🗑️</Step>
+          <Step n={2}><strong>ระบบ</strong> — แสดง Confirmation Dialog พร้อมคำเตือน</Step>
+          <Step n={3}><strong>🔴🔵🟢</strong> — กด &quot;Delete&quot; ยืนยัน → <code>deleteDoc</code> → Project หายออกจากรายการทันที</Step>
+        </div>
+        <WarnBox>⚠️ การลบโครงการ <strong>ไม่ได้ลบ</strong> Transmittal และ Document ที่อยู่ในโครงการนั้น</WarnBox>
+
+        <SubTitle>16.11 จัดการ User (Role / Disable / Project)</SubTitle>
+        <p className="text-sm text-gray-600 mb-2">ผู้เกี่ยวข้อง: 🔴 MasterAdmin เท่านั้น</p>
+        <div className="space-y-2">
+          <Step n={1}><strong>เปลี่ยน Role</strong> — เลือก Dropdown Role ข้าง User → ระบบอัพเดท Firestore ทันที เมนู Sidebar ของ User เปลี่ยนทันที (Real-time)</Step>
+          <Step n={2}><strong>Disable User</strong> — กด &quot;Disable&quot; → <code>status: &quot;disabled&quot;</code> User เข้าระบบไม่ได้ทันที</Step>
+          <Step n={3}><strong>Re-enable User</strong> — กด &quot;Re-enable&quot; → <code>status: &quot;active&quot;</code> User เข้าระบบได้ทันที</Step>
+          <Step n={4}><strong>กำหนดโครงการ</strong> — กด Dropdown &quot;Projects&quot; → ติ๊ก Checkbox → บันทึก <code>assignedProjectIds[]</code> ทันที (MasterAdmin/Admin เห็นทุกโครงการอัตโนมัติ)</Step>
+        </div>
+
+        <SubTitle>16.12 ตารางสรุป: ใครทำอะไรได้บ้าง</SubTitle>
+        <TableWrapper>
+          <thead>
+            <tr>
+              <Th>กระบวนการ</Th>
+              <th className="px-4 py-2.5 bg-gray-50 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">🔴 MA</th>
+              <th className="px-4 py-2.5 bg-gray-50 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">🔵 Admin</th>
+              <th className="px-4 py-2.5 bg-gray-50 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">🟢 Mgr</th>
+              <th className="px-4 py-2.5 bg-gray-50 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">🟡 Eng</th>
+              <th className="px-4 py-2.5 bg-gray-50 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">⚪ Viewer</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><Td>Sign in / Register</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td></tr>
+            <tr><Td>ดู Dashboard</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td></tr>
+            <tr><Td>สร้าง Transmittal In/Out</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td><Td center>❌</Td></tr>
+            <tr><Td>ดู Transmittal In/Out</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td></tr>
+            <tr><Td>บันทึก / ดู Document</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td><Td center>ดูเท่านั้น</Td></tr>
+            <tr><Td>อัพเดทสถานะ Document</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td><Td center>❌</Td></tr>
+            <tr><Td>สร้าง / แก้ไข / ลบโครงการ</Td><Td center>✅</Td><Td center>✅</Td><Td center>✅</Td><Td center>❌</Td><Td center>❌</Td></tr>
+            <tr><Td>Approve / Disable / ลบ User</Td><Td center>✅</Td><Td center>❌</Td><Td center>❌</Td><Td center>❌</Td><Td center>❌</Td></tr>
+            <tr><Td>เปลี่ยน Role / กำหนดโครงการ User</Td><Td center>✅</Td><Td center>❌</Td><Td center>❌</Td><Td center>❌</Td><Td center>❌</Td></tr>
+            <tr><Td>เข้า Settings</Td><Td center>✅</Td><Td center>✅</Td><Td center>❌</Td><Td center>❌</Td><Td center>❌</Td></tr>
           </tbody>
         </TableWrapper>
 
