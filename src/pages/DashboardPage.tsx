@@ -59,14 +59,14 @@ export default function DashboardPage() {
 
   const transmittalsIn = transmittals.filter((t) => t.type === 'in')
   const transmittalsOut = transmittals.filter((t) => t.type === 'out')
-  const pendingReview = documents.filter((d) => d.status === 'Under Review')
+  const pendingReply = transmittals.filter((t) => t.requiresReply && t.status !== 'Closed')
   const recentTransmittals = [...transmittals].sort((a, b) => b.date.seconds - a.date.seconds).slice(0, 5)
 
   const STATS = [
     { label: 'Total Documents', value: String(documents.filter((d) => d.isLatest).length), icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Transmittals In', value: String(transmittalsIn.length), icon: ArrowDownToLine, color: 'text-green-600', bg: 'bg-green-50' },
     { label: 'Transmittals Out', value: String(transmittalsOut.length), icon: ArrowUpFromLine, color: 'text-orange-600', bg: 'bg-orange-50' },
-    { label: 'Pending Review', value: String(pendingReview.length), icon: Clock, color: 'text-red-600', bg: 'bg-red-50' },
+    { label: 'Pending Reply', value: String(pendingReply.length), icon: Clock, color: 'text-red-600', bg: 'bg-red-50' },
   ]
 
   return (
