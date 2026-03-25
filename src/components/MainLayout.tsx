@@ -14,6 +14,7 @@ import {
   Layers,
   UserCog,
   Users,
+  BookOpen,
 } from 'lucide-react'
 import { useProject } from '@/contexts/ProjectContext'
 import { useAuth } from '@/contexts/AuthContext'
@@ -219,6 +220,21 @@ export default function MainLayout() {
             </div>
           )}
         </nav>
+
+        {/* User Manual link — visible to all roles */}
+        <div className="px-2 pb-2 shrink-0">
+          <NavLink
+            to="/manual"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+              ${isActive ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`
+            }
+            title={!sidebarOpen ? 'User Manual' : undefined}
+          >
+            <BookOpen size={18} className="shrink-0" />
+            {sidebarOpen && <span className="truncate">User Manual</span>}
+          </NavLink>
+        </div>
 
         {/* Sidebar Footer */}
         {sidebarOpen && (

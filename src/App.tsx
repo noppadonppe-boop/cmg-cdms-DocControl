@@ -13,6 +13,7 @@ import DocumentRegisterPage from '@/pages/DocumentRegisterPage'
 import SettingsPage from '@/pages/SettingsPage'
 import ProjectManagementPage from '@/pages/ProjectManagementPage'
 import UserManagementPage from '@/pages/UserManagementPage'
+import UserManualPage from '@/pages/UserManualPage'
 import ErrorBoundary from '@/components/ErrorBoundary'
 
 function App() {
@@ -33,6 +34,7 @@ function App() {
                 <Route path="/projects" element={<ErrorBoundary><ProjectManagementPage /></ErrorBoundary>} />
                 <Route path="/settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />
                 <Route path="/users" element={<ErrorBoundary><UserManagementPage /></ErrorBoundary>} />
+                <Route path="/manual" element={<ErrorBoundary><UserManualPage /></ErrorBoundary>} />
               </Route>
             </Route>
           </Routes>
