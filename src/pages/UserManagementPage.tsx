@@ -74,7 +74,8 @@ export default function UserManagementPage() {
         setPopoverPos(null)
       }
     }
-    function handleScroll() {
+    function handleScroll(e: Event) {
+      if (popoverRef.current && popoverRef.current.contains(e.target as Node)) return
       setProjectPopoverUid(null)
       setPopoverPos(null)
     }
@@ -93,7 +94,13 @@ export default function UserManagementPage() {
       return
     }
     const rect = btn.getBoundingClientRect()
-    setPopoverPos({ top: rect.bottom + 4, left: rect.left })
+    const popoverHeight = 260
+    const spaceBelow = window.innerHeight - rect.bottom
+    const top = spaceBelow >= popoverHeight
+      ? rect.bottom + 4
+      : rect.top - popoverHeight - 4
+    const left = Math.min(rect.left, window.innerWidth - 244)
+    setPopoverPos({ top, left })
     setProjectPopoverUid(uid)
   }, [projectPopoverUid])
 
