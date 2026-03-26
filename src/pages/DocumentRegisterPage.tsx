@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useProject } from '@/contexts/ProjectContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { useUser } from '@/contexts/UserContext'
 import NoProjectSelected from '@/components/NoProjectSelected'
 import { useEditLock } from '@/hooks/useEditLock'
 import EditLockBanner from '@/components/EditLockBanner'
+import DocumentDetailModal from '@/components/DocumentDetailModal'
 import type { Document, DocumentCategory, DocumentStatus } from '@/types'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
@@ -55,6 +57,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 export default function DocumentRegisterPage() {
   const { selectedProject } = useProject()
   const { currentUser } = useAuth()
+  const { userProfile } = useUser()
   const [search, setSearch] = useState('')
   const [showSuperseded, setShowSuperseded] = useState(false)
   const [allDocs, setAllDocs] = useState<Document[]>([])
@@ -62,6 +65,9 @@ export default function DocumentRegisterPage() {
   const [docForm, setDocForm] = useState({ ...EMPTY_DOC_FORM })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [detailItem, setDetailItem] = useState<Document | null>(null)
+
+  const canEditDelete = userProfile?.role === 'MasterAdmin' || userProfile?.role === 'Admin' || userProfile?.role === 'SiteAdmin'
 
   const lockPath = `CMG-cdms-DocControl/root/documents_${selectedProject?.projectId ?? 'none'}`
   const { acquireLock, releaseLock, forceReleaseLock, isLockedByOther, isLockedByMe, lockedByName } = useEditLock(lockPath)
@@ -227,9 +233,11 @@ export default function DocumentRegisterPage() {
                   data.map((d) => (
                     <tr
                       key={d.documentId}
-                      className={`hover:bg-gray-50 transition-colors cursor-pointer ${
+                      className={`hover:bg-gray-50 transition-colors cursor-pointer select-none ${
                         !d.isLatest ? 'opacity-50' : ''
                       }`}
+                      onDoubleClick={() => setDetailItem(d)}
+                      title="Double-click to view details"
                     >
                       <td className="px-5 py-3 font-mono text-xs font-medium text-blue-700">{d.documentNo}</td>
                       <td className="px-5 py-3 text-gray-700 max-w-xs">
@@ -296,6 +304,18 @@ export default function DocumentRegisterPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Detail / Edit / Delete Modal */}
+      {detailItem && currentUser && (
+        <DocumentDetailModal
+          document={detailItem as Document & { fileUrls?: string[] }}
+          canEditDelete={canEditDelete}
+          projectId={selectedProject.projectId}
+          currentUserUid={currentUser.uid}
+          onClose={() => setDetailItem(null)}
+          onDeleted={() => setDetailItem(null)}
+        />
+      )}
 
       {/* Add Document slide-over panel */}
       {panelOpen && (

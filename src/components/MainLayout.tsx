@@ -36,6 +36,7 @@ const NAV_ADMIN = [
 const ROLE_COLORS: Record<string, string> = {
   MasterAdmin: 'text-purple-400',
   Admin:       'text-blue-400',
+  SiteAdmin:   'text-sky-400',
   Manager:     'text-indigo-400',
   Engineer:    'text-cyan-400',
   Viewer:      'text-slate-400',

@@ -4,7 +4,7 @@ import type { Timestamp } from 'firebase/firestore';
 // Shared Enums / Union Types
 // ---------------------------------------------------------------------------
 
-export type UserRole = 'MasterAdmin' | 'Admin' | 'Manager' | 'Engineer' | 'Viewer';
+export type UserRole = 'MasterAdmin' | 'Admin' | 'SiteAdmin' | 'Manager' | 'Engineer' | 'Viewer';
 
 export type UserStatus = 'active' | 'pending' | 'disabled';
 

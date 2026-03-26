@@ -60,6 +60,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       let projects: Project[]
       if (cachedRole === 'MasterAdmin' || cachedRole === 'Admin') {
         projects = cachedProjects
+      } else if (cachedRole === 'SiteAdmin' && cachedAssigned !== null) {
+        projects = cachedProjects.filter((p) => cachedAssigned!.includes(p.projectId))
       } else if (cachedAssigned !== null) {
         // assignedProjectIds was explicitly set — honour it (even if empty)
         projects = cachedProjects.filter((p) => cachedAssigned!.includes(p.projectId))

@@ -184,22 +184,25 @@ export default function UserManualPage() {
         <SectionTitle id="roles"><Users size={18} className="text-green-500" /> User Role และสิทธิ์การใช้งาน</SectionTitle>
 
         <SubTitle>ตารางสิทธิ์ตาม Role</SubTitle>
+        <InfoBox>
+          <strong>SiteAdmin</strong> — Role ใหม่ มีสิทธิ์เทียบเท่า Admin แต่เข้าถึงได้เฉพาะ <strong>โครงการที่ถูก Assign</strong> เท่านั้น (ต่างจาก Admin ที่เห็นทุกโครงการ)
+        </InfoBox>
         <TableWrapper>
           <thead>
             <tr>
               <Th>เมนู / Module</Th>
-              <Th>MasterAdmin</Th><Th>Admin</Th><Th>Manager</Th><Th>Engineer</Th><Th>Viewer</Th>
+              <Th>MasterAdmin</Th><Th>Admin</Th><Th>SiteAdmin</Th><Th>Manager</Th><Th>Engineer</Th><Th>Viewer</Th>
             </tr>
           </thead>
           <tbody>
             {[
-              ['Dashboard', true, true, true, true, true],
-              ['Transmittal In', true, true, true, true, true],
-              ['Transmittal Out', true, true, true, true, true],
-              ['Document Register', true, true, true, true, true],
-              ['Project Management', true, true, true, false, false],
-              ['Settings', true, true, false, false, false],
-              ['User Management', true, false, false, false, false],
+              ['Dashboard', true, true, true, true, true, true],
+              ['Transmittal In', true, true, true, true, true, true],
+              ['Transmittal Out', true, true, true, true, true, true],
+              ['Document Register', true, true, true, true, true, true],
+              ['Project Management', true, true, true, true, false, false],
+              ['Settings', true, true, true, false, false, false],
+              ['User Management', true, false, false, false, false, false],
             ].map(([label, ...perms]) => (
               <tr key={String(label)}>
                 <Td><strong>{label}</strong></Td>
@@ -211,20 +214,41 @@ export default function UserManualPage() {
           </tbody>
         </TableWrapper>
 
-        <SubTitle>สิทธิ์การเขียนข้อมูล</SubTitle>
+        <SubTitle>สิทธิ์ Double-click แก้ไข / ลบข้อมูล</SubTitle>
         <TableWrapper>
-          <thead><tr><Th>การดำเนินการ</Th><Th>MasterAdmin</Th><Th>Admin</Th><Th>Manager</Th><Th>Engineer</Th><Th>Viewer</Th></tr></thead>
+          <thead><tr><Th>การดำเนินการ</Th><Th>MasterAdmin</Th><Th>Admin</Th><Th>SiteAdmin</Th><Th>Manager</Th><Th>Engineer</Th><Th>Viewer</Th></tr></thead>
           <tbody>
             {[
-              ['สร้าง Transmittal ใหม่', true, true, true, true, false],
-              ['สร้าง Document ใหม่', true, true, true, true, false],
-              ['แก้ไข / ลบ Transmittal', true, true, false, false, false],
-              ['แก้ไข / ลบ Document', true, true, false, false, false],
-              ['สร้างโครงการ', true, true, true, false, false],
-              ['Approve / Disable User', true, false, false, false, false],
+              ['Double-click ดูรายละเอียด', true, true, true, true, true, true],
+              ['Double-click แก้ไข Transmittal', true, true, true, false, false, false],
+              ['Double-click ลบ Transmittal', true, true, true, false, false, false],
+              ['Double-click แก้ไข Document', true, true, true, false, false, false],
+              ['Double-click ลบ Document', true, true, true, false, false, false],
             ].map(([label, ...perms]) => (
               <tr key={String(label)}>
-                <Td>{label}</Td>
+                <Td>{String(label)}</Td>
+                {(perms as boolean[]).map((p, i) => (
+                  <Td key={i} center>{p ? '✅' : '❌'}</Td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </TableWrapper>
+
+        <SubTitle>สิทธิ์การเขียนข้อมูล</SubTitle>
+        <TableWrapper>
+          <thead><tr><Th>การดำเนินการ</Th><Th>MasterAdmin</Th><Th>Admin</Th><Th>SiteAdmin</Th><Th>Manager</Th><Th>Engineer</Th><Th>Viewer</Th></tr></thead>
+          <tbody>
+            {[
+              ['สร้าง Transmittal ใหม่',  true, true, true, true, true, false],
+              ['สร้าง Document ใหม่',     true, true, true, true, true, false],
+              ['แก้ไข / ลบ Transmittal', true, true, true, false, false, false],
+              ['แก้ไข / ลบ Document',    true, true, true, false, false, false],
+              ['สร้าง / แก้ไข / ลบ โครงการ', true, true, true, true, false, false],
+              ['Approve / Disable User', true, false, false, false, false, false],
+            ].map(([label, ...perms]) => (
+              <tr key={String(label)}>
+                <Td>{String(label)}</Td>
                 {(perms as boolean[]).map((p, i) => <Td key={i} center>{p ? '✅' : '❌'}</Td>)}
               </tr>
             ))}
@@ -317,12 +341,16 @@ export default function UserManualPage() {
 
         <InfoBox>💡 Transmittal ที่มี Purpose = <strong>For Approval</strong> หรือ <strong>For Action</strong> จะถูกตั้ง <code>requiresReply = true</code> อัตโนมัติ และนับใน Pending Reply บน Dashboard</InfoBox>
 
+        <InfoBox>👉 <strong>Double-click</strong> ที่แถว Transmittal ใดๆ เพื่อดูรายละเอียด — ผู้ที่มีสิทธิ์ <strong>MasterAdmin / Admin / SiteAdmin</strong> ยังแก้ไขและลบได้เพิ่มเติม</InfoBox>
+
         {/* ════════════════════════════════════════ */}
         {/* SECTION 6: Transmittal Out */}
         {/* ════════════════════════════════════════ */}
         <SectionTitle id="transmittal-out"><ArrowUpFromLine size={18} className="text-orange-500" /> Transmittal Out (ส่งเอกสาร)</SectionTitle>
 
         <p className="text-sm text-gray-600 mb-4">บันทึกและติดตามเอกสารที่ <strong>ส่งออก</strong> ไปยังภายนอก Workflow เหมือน Transmittal In แต่ <code className="bg-gray-100 px-1 rounded">type = 'out'</code></p>
+
+        <InfoBox>👉 <strong>Double-click</strong> ที่แถว Transmittal ใดๆ เพื่อดูรายละเอียด — ผู้ที่มีสิทธิ์ <strong>MasterAdmin / Admin / SiteAdmin</strong> ยังแก้ไขและลบได้เพิ่มเติม</InfoBox>
 
         <SubTitle>ความแตกต่างจาก Transmittal In</SubTitle>
         <TableWrapper>
@@ -373,6 +401,8 @@ export default function UserManualPage() {
           <Step n={4}>กด <strong>Save</strong> → บันทึกลง Firestore พร้อม <code>isLatest: true</code></Step>
           <Step n={5}>ระบบสร้าง <strong>Audit Log</strong> ใน <code>document_history</code> อัตโนมัติ (action: Created)</Step>
         </div>
+
+        <InfoBox>👉 <strong>Double-click</strong> ที่แถว Document ใดๆ เพื่อดูรายละเอียด — ผู้ที่มีสิทธิ์ <strong>MasterAdmin / Admin / SiteAdmin</strong> ยังแก้ไข Status, Status Code, Review Comment และลบได้เพิ่มเติม</InfoBox>
 
         <SubTitle>Revision Control</SubTitle>
         <p className="text-sm text-gray-600 mb-3">เมื่อเอกสารได้รับ <Badge color="bg-red-100 text-red-700">Code C — Revise and Resubmit</Badge> ระบบสร้าง Revision ใหม่อัตโนมัติ:</p>

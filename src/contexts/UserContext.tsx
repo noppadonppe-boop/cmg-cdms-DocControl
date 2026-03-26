@@ -115,6 +115,7 @@ export function useUser() {
 export const ROLE_MODULES: Record<UserRole, string[]> = {
   MasterAdmin: ['dashboard', 'transmittal-in', 'transmittal-out', 'documents', 'projects', 'settings', 'users'],
   Admin:       ['dashboard', 'transmittal-in', 'transmittal-out', 'documents', 'projects', 'settings'],
+  SiteAdmin:   ['dashboard', 'transmittal-in', 'transmittal-out', 'documents', 'projects', 'settings'],
   Manager:     ['dashboard', 'transmittal-in', 'transmittal-out', 'documents', 'projects'],
   Engineer:    ['dashboard', 'transmittal-in', 'transmittal-out', 'documents'],
   Viewer:      ['dashboard', 'transmittal-in', 'transmittal-out', 'documents'],

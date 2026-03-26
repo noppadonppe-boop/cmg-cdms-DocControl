@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useProject } from '@/contexts/ProjectContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { useUser } from '@/contexts/UserContext'
 import NoProjectSelected from '@/components/NoProjectSelected'
 import { useEditLock } from '@/hooks/useEditLock'
 import EditLockBanner from '@/components/EditLockBanner'
+import TransmittalDetailModal from '@/components/TransmittalDetailModal'
 import type { Transmittal, TransmittalPurpose, TransmittalStatus } from '@/types'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
@@ -41,12 +43,16 @@ const EMPTY_FORM = {
 export default function TransmittalInPage() {
   const { selectedProject } = useProject()
   const { currentUser } = useAuth()
+  const { userProfile } = useUser()
   const [search, setSearch] = useState('')
   const [allData, setAllData] = useState<Transmittal[]>([])
   const [panelOpen, setPanelOpen] = useState(false)
   const [form, setForm] = useState({ ...EMPTY_FORM })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [detailItem, setDetailItem] = useState<Transmittal | null>(null)
+
+  const canEditDelete = userProfile?.role === 'MasterAdmin' || userProfile?.role === 'Admin' || userProfile?.role === 'SiteAdmin'
 
   const lockPath = `CMG-cdms-DocControl/root/transmittals_in_${selectedProject?.projectId ?? 'none'}`
   const { acquireLock, releaseLock, forceReleaseLock, isLockedByOther, isLockedByMe, lockedByName } = useEditLock(lockPath)
@@ -196,7 +202,12 @@ export default function TransmittalInPage() {
                   </tr>
                 ) : (
                   data.map((t) => (
-                    <tr key={t.transmittalId} className="hover:bg-gray-50 transition-colors cursor-pointer">
+                    <tr
+                      key={t.transmittalId}
+                      className="hover:bg-gray-50 transition-colors cursor-pointer select-none"
+                      onDoubleClick={() => setDetailItem(t)}
+                      title="Double-click to view details"
+                    >
                       <td className="px-5 py-3 font-mono text-xs font-medium text-blue-700">{t.transmittalNo}</td>
                       <td className="px-5 py-3 text-gray-700 max-w-[160px] truncate">{t.sender}</td>
                       <td className="px-5 py-3 text-gray-700 max-w-xs truncate">{t.subject}</td>
@@ -255,6 +266,18 @@ export default function TransmittalInPage() {
           </div>
         </CardContent>
       </Card>
+      {/* Detail / Edit / Delete Modal */}
+      {detailItem && (
+        <TransmittalDetailModal
+          transmittal={detailItem as Transmittal & { fileUrls?: string[] }}
+          transmittalType="in"
+          canEditDelete={canEditDelete}
+          projectId={selectedProject.projectId}
+          onClose={() => setDetailItem(null)}
+          onDeleted={() => setDetailItem(null)}
+        />
+      )}
+
       {/* New Transmittal slide-over panel */}
       {panelOpen && (
         <>

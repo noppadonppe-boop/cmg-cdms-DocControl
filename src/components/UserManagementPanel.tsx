@@ -6,6 +6,7 @@ import type { User, UserRole, UserStatus } from '@/types'
 const ROLE_COLORS: Record<UserRole, string> = {
   MasterAdmin: 'bg-purple-100 text-purple-700',
   Admin:       'bg-blue-100 text-blue-700',
+  SiteAdmin:   'bg-sky-100 text-sky-700',
   Manager:     'bg-indigo-100 text-indigo-700',
   Engineer:    'bg-cyan-100 text-cyan-700',
   Viewer:      'bg-gray-100 text-gray-600',
@@ -17,7 +18,7 @@ const STATUS_COLORS: Record<string, string> = {
   disabled: 'bg-red-100 text-red-600',
 }
 
-const ALL_ROLES: UserRole[] = ['MasterAdmin', 'Admin', 'Manager', 'Engineer', 'Viewer']
+const ALL_ROLES: UserRole[] = ['MasterAdmin', 'Admin', 'SiteAdmin', 'Manager', 'Engineer', 'Viewer']
 
 interface Props {
   open: boolean
