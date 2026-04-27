@@ -5,6 +5,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { Document, DocumentCategory, DocumentStatus, StatusCode } from '@/types'
 
+/** Extract a human-readable filename from a Firebase Storage URL */
+function fileNameFromUrl(url: string): string {
+  try {
+    const decoded = decodeURIComponent(new URL(url).pathname)
+    const raw = decoded.split('/').pop() ?? url
+    // strip leading path segments before last '/'
+    // Strip timestamp suffix added during upload: _1234567890
+    return raw.replace(/_\d{10,}(\.[^.]+)$/, '$1').replace(/.*\//, '')
+  } catch {
+    return url
+  }
+}
+
 const CATEGORIES: DocumentCategory[] = ['Drawing', 'Specification', 'Material Approval', 'Method Statement', 'Report', 'Correspondence', 'Other']
 const DOC_STATUSES: DocumentStatus[] = ['Draft', 'Submitted', 'Under Review', 'Approved', 'Approved as Noted', 'Revise and Resubmit', 'Rejected']
 const STATUS_CODES: { value: StatusCode; label: string }[] = [
@@ -197,8 +210,9 @@ export default function DocumentDetailModal({
                   <div className="flex flex-col gap-1">
                     {fileUrls.map((url, i) => (
                       <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                        title={url}
                         className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
-                        <ExternalLink size={12} /> File {i + 1}
+                        <ExternalLink size={12} />{fileNameFromUrl(url)}
                       </a>
                     ))}
                   </div>

@@ -148,6 +148,10 @@ export interface Document {
    */
   statusCode?: StatusCode;
   reviewComment?: string;
+  /** User-configurable drawing type (e.g. "Plan", "Section", "Detail") */
+  dwgType?: string;
+  /** User-configurable detail status (e.g. "In Progress", "Completed") */
+  detailStatus?: string;
   createdAt: Timestamp;
   createdBy: string;
   updatedAt: Timestamp;

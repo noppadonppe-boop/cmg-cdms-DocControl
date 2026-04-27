@@ -5,6 +5,18 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { Transmittal, TransmittalPurpose, TransmittalStatus } from '@/types'
 
+/** Extract a human-readable filename from a Firebase Storage URL */
+function fileNameFromUrl(url: string): string {
+  try {
+    const decoded = decodeURIComponent(new URL(url).pathname)
+    const raw = decoded.split('/').pop() ?? url
+    // Strip timestamp suffix added during upload: _1234567890
+    return raw.replace(/_\d{10,}(\.[^.]+)$/, '$1').replace(/.*\//, '')
+  } catch {
+    return url
+  }
+}
+
 const PURPOSE_COLORS: Record<string, string> = {
   'For Approval': 'bg-purple-100 text-purple-700',
   'For Action': 'bg-orange-100 text-orange-700',
@@ -173,8 +185,9 @@ export default function TransmittalDetailModal({
                   <div className="flex flex-col gap-1">
                     {fileUrls.map((url, i) => (
                       <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                        title={url}
                         className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
-                        <ExternalLink size={12} /> File {i + 1}
+                        <ExternalLink size={12} />{fileNameFromUrl(url)}
                       </a>
                     ))}
                   </div>

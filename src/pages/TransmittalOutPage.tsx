@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
-import { Plus, Search, Filter, X, Loader2, ExternalLink, Mail } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Search, Filter, X, Loader2, Mail, Columns, GripVertical } from 'lucide-react'
 import FileUploadField from '@/components/FileUploadField'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { useProject } from '@/contexts/ProjectContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useUser } from '@/contexts/UserContext'
@@ -51,6 +51,29 @@ export default function TransmittalOutPage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [detailItem, setDetailItem] = useState<Transmittal | null>(null)
+
+  const columnsMenuRef = useRef<HTMLDivElement>(null)
+  const [columnsMenuOpen, setColumnsMenuOpen] = useState(false)
+  const [columns, setColumns] = useState([
+    { id: 'transmittalNo', label: 'Transmittal No.', visible: true },
+    { id: 'recipient', label: 'To', visible: true },
+    { id: 'subject', label: 'Subject', visible: true },
+    { id: 'purpose', label: 'Purpose', visible: true },
+    { id: 'date', label: 'Date', visible: true },
+    { id: 'requiresReply', label: 'Reply Req.', visible: true },
+    { id: 'status', label: 'Status', visible: true },
+    { id: 'file', label: 'File', visible: true },
+    { id: 'actions', label: '', visible: true },
+  ])
+  const [draggedColumnIdx, setDraggedColumnIdx] = useState<number | null>(null)
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (columnsMenuRef.current && !columnsMenuRef.current.contains(e.target as Node)) setColumnsMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
 
   const canEditDelete = userProfile?.role === 'MasterAdmin' || userProfile?.role === 'Admin' || userProfile?.role === 'SiteAdmin'
 
@@ -129,67 +152,102 @@ export default function TransmittalOutPage() {
     )
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Transmittal Out</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Outgoing transmittals · <span className="font-medium text-gray-700">{selectedProject.name}</span>
-          </p>
+    <div className="flex flex-col h-full gap-1.5">
+      {/* Compact single-row toolbar */}
+      <div className="flex items-center gap-2 flex-wrap shrink-0">
+        <div className="flex items-baseline gap-2 shrink-0">
+          <h1 className="text-base font-bold text-gray-900">Transmittal Out</h1>
+          <span className="text-xs text-gray-400">{allData.length} items · <span className="font-medium text-gray-600">{selectedProject.name}</span></span>
         </div>
-        <Button className="flex items-center gap-2" onClick={openPanel}>
-          <Plus size={16} />
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Input
+            placeholder="Search by no., subject, recipient..."
+            className="pl-8 h-7 text-xs"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Button variant="outline" className="h-7 px-2.5 gap-1.5 text-xs">
+          <Filter size={12} />
+          Filter
+        </Button>
+        <div className="relative" ref={columnsMenuRef}>
+          <Button variant="outline" className="h-7 px-2.5 gap-1.5 text-xs" onClick={() => setColumnsMenuOpen(!columnsMenuOpen)}>
+            <Columns size={12} />
+            Columns
+          </Button>
+          {columnsMenuOpen && (
+            <div className="absolute top-full right-0 mt-1 w-56 bg-white border border-gray-200 shadow-xl rounded-md z-50 flex flex-col py-1">
+              <div className="px-3 py-2 border-b border-gray-100 font-semibold text-xs text-gray-700">
+                Manage Columns
+              </div>
+              <div className="max-h-64 overflow-y-auto p-1">
+                {columns.map((col, idx) => (
+                  <div
+                    key={col.id}
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggedColumnIdx(idx)
+                      e.dataTransfer.effectAllowed = 'move'
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = 'move'
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      if (draggedColumnIdx === null || draggedColumnIdx === idx) return
+                      const next = [...columns]
+                      const [moved] = next.splice(draggedColumnIdx, 1)
+                      next.splice(idx, 0, moved)
+                      setColumns(next)
+                      setDraggedColumnIdx(null)
+                    }}
+                    className={`flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded text-xs cursor-move ${draggedColumnIdx === idx ? 'opacity-50 bg-gray-100' : ''}`}
+                  >
+                    <GripVertical size={12} className="text-gray-400" />
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={col.visible}
+                      onChange={(e) => {
+                        const next = [...columns]
+                        next[idx].visible = e.target.checked
+                        setColumns(next)
+                      }}
+                    />
+                    <span className="flex-1 truncate select-none text-gray-700">{col.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <Button className="flex items-center gap-1.5 h-7 px-3 text-xs shrink-0" onClick={openPanel}>
+          <Plus size={13} />
           New Transmittal
         </Button>
       </div>
 
-      {/* Filters */}
-      <Card className="border border-gray-200 shadow-sm">
-        <CardContent className="flex flex-wrap items-center gap-3 p-4">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Search by no., subject, recipient..."
-              className="pl-9 h-9 text-sm"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <Button variant="outline" className="h-9 gap-2 text-sm">
-            <Filter size={14} />
-            Filter
-          </Button>
-        </CardContent>
-      </Card>
-
       {/* Table */}
-      <Card className="border border-gray-200 shadow-sm">
-        <CardHeader className="pb-0 pt-4 px-5">
-          <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-            {data.length} Transmittals
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0 mt-2">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-t border-gray-100 bg-gray-50">
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Transmittal No.</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">To</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Subject</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Purpose</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Reply Req.</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">File</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
+      <Card className="border border-gray-200 shadow-sm flex-1 flex flex-col overflow-hidden">
+        <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
+          <div className="overflow-auto flex-1">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  {columns.filter(c => c.visible).map(c => (
+                    <th key={c.id} className="text-left px-3 py-1 font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                      {c.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {data.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-5 py-8 text-center text-sm text-gray-400">
+                    <td colSpan={columns.filter(c => c.visible).length} className="px-3 py-6 text-center text-xs text-gray-400">
                       No transmittals found.
                     </td>
                   </tr>
@@ -197,60 +255,39 @@ export default function TransmittalOutPage() {
                   data.map((t) => (
                     <tr
                       key={t.transmittalId}
-                      className="hover:bg-gray-50 transition-colors cursor-pointer select-none"
+                      className="hover:bg-blue-50/40 transition-colors cursor-pointer select-none"
                       onDoubleClick={() => setDetailItem(t)}
                       title="Double-click to view details"
                     >
-                      <td className="px-5 py-3 font-mono text-xs font-medium text-blue-700">{t.transmittalNo}</td>
-                      <td className="px-5 py-3 text-gray-700 max-w-[160px] truncate">{t.recipient}</td>
-                      <td className="px-5 py-3 text-gray-700 max-w-xs truncate">{t.subject}</td>
-                      <td className="px-5 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${PURPOSE_COLORS[t.purpose] ?? 'bg-gray-100 text-gray-600'}`}>
-                          {t.purpose}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-gray-500 whitespace-nowrap">
-                        {new Date(t.date.seconds * 1000).toLocaleDateString('en-GB')}
-                      </td>
-                      <td className="px-5 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                          t.requiresReply ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {t.requiresReply ? 'Yes' : 'No'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[t.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                          {t.status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3">
-                        {(() => {
-                          const urls: string[] = (t as Transmittal & { fileUrls?: string[]; fileUrl?: string }).fileUrls
-                            ?? ((t as Transmittal & { fileUrls?: string[]; fileUrl?: string }).fileUrl ? [(t as Transmittal & { fileUrls?: string[]; fileUrl?: string }).fileUrl!] : [])
-                          if (!urls.length) return <span className="text-gray-300 text-xs">—</span>
-                          return (
-                            <div className="flex flex-col gap-0.5">
-                              {urls.map((url, i) => (
-                                <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
-                                  <ExternalLink size={11} />{i + 1}
-                                </a>
-                              ))}
-                            </div>
+                      {columns.filter(c => c.visible).map(col => {
+                        switch (col.id) {
+                          case 'transmittalNo': return <td key={col.id} className="px-3 py-0.5 font-mono font-medium text-blue-700 whitespace-nowrap">{t.transmittalNo}</td>
+                          case 'recipient': return <td key={col.id} className="px-3 py-0.5 text-gray-700 max-w-[160px] truncate">{t.recipient}</td>
+                          case 'subject': return <td key={col.id} className="px-3 py-0.5 text-gray-700 max-w-[240px] truncate">{t.subject}</td>
+                          case 'purpose': return <td key={col.id} className="px-3 py-0.5"><span className={`inline-flex px-1.5 py-px rounded font-medium ${PURPOSE_COLORS[t.purpose] ?? 'bg-gray-100 text-gray-600'}`}>{t.purpose}</span></td>
+                          case 'date': return <td key={col.id} className="px-3 py-0.5 text-gray-500 whitespace-nowrap">{new Date(t.date.seconds * 1000).toLocaleDateString('en-GB')}</td>
+                          case 'requiresReply': return <td key={col.id} className="px-3 py-0.5"><span className={`inline-flex px-1.5 py-px rounded font-medium ${t.requiresReply ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>{t.requiresReply ? 'Yes' : 'No'}</span></td>
+                          case 'status': return <td key={col.id} className="px-3 py-0.5"><span className={`inline-flex px-1.5 py-px rounded font-medium ${STATUS_COLORS[t.status] ?? 'bg-gray-100 text-gray-600'}`}>{t.status}</span></td>
+                          case 'file': {
+                            const urls: string[] = (t as Transmittal & { fileUrls?: string[]; fileUrl?: string }).fileUrls ?? ((t as Transmittal & { fileUrls?: string[]; fileUrl?: string }).fileUrl ? [(t as Transmittal & { fileUrls?: string[]; fileUrl?: string }).fileUrl!] : [])
+                            return (
+                              <td key={col.id} className="px-3 py-0.5 text-center">
+                                {urls.length > 0 ? (
+                                  <span className="text-gray-600 font-medium">{urls.length}</span>
+                                ) : (
+                                  <span className="text-gray-300">—</span>
+                                )}
+                              </td>
+                            )
+                          }
+                          case 'actions': return (
+                            <td key={col.id} className="px-3 py-0.5" onClick={(e) => e.stopPropagation()}>
+                              <a href={`mailto:?subject=${encodeURIComponent(`[${t.transmittalNo}] ${t.subject}`)}&body=${encodeURIComponent(`Transmittal No.: ${t.transmittalNo}\nFrom: ${t.sender}\nTo: ${t.recipient ?? ''}\nSubject: ${t.subject}\nPurpose: ${t.purpose}\nStatus: ${t.status}\nDate: ${new Date(t.date.seconds * 1000).toLocaleDateString('en-GB')}`)}`} title="Send email" className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Mail size={12} /></a>
+                            </td>
                           )
-                        })()}
-                      </td>
-                      <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
-                        <a
-                          href={`mailto:?subject=${encodeURIComponent(`[${t.transmittalNo}] ${t.subject}`)}&body=${encodeURIComponent(`Transmittal No.: ${t.transmittalNo}\nFrom: ${t.sender}\nTo: ${t.recipient ?? ''}\nSubject: ${t.subject}\nPurpose: ${t.purpose}\nStatus: ${t.status}\nDate: ${new Date(t.date.seconds * 1000).toLocaleDateString('en-GB')}`)}`}
-                          title="Send email"
-                          className="inline-flex items-center justify-center w-7 h-7 rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                        >
-                          <Mail size={14} />
-                        </a>
-                      </td>
+                          default: return null;
+                        }
+                      })}
                     </tr>
                   ))
                 )}

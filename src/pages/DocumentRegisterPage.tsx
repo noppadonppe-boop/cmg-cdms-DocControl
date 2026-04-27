@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
-import { Plus, Search, Filter, X, Loader2, ExternalLink, Mail } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Search, Filter, X, Loader2, Mail, ChevronDown, Trash2, Columns, GripVertical } from 'lucide-react'
 import FileUploadField from '@/components/FileUploadField'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { useProject } from '@/contexts/ProjectContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useUser } from '@/contexts/UserContext'
@@ -24,13 +24,19 @@ const EMPTY_DOC_FORM = {
   status: 'Submitted' as DocumentStatus,
   transmittalId: '',
   fileUrls: [] as string[],
+  dwgType: '',
+  detailStatus: '',
 }
 
+// โ”€โ”€ Firestore path helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+const DWG_TYPE_DOC   = (pid: string) => `CMG-cdms-DocControl/root/project_settings/${pid}`
+
+
 const STATUS_CODE_LABELS: Record<string, { label: string; cls: string }> = {
-  A: { label: 'A – Approved', cls: 'bg-green-100 text-green-700' },
-  B: { label: 'B – Approved as Noted', cls: 'bg-teal-100 text-teal-700' },
-  C: { label: 'C – Revise & Resubmit', cls: 'bg-red-100 text-red-700' },
-  D: { label: 'D – Rejected', cls: 'bg-red-200 text-red-800' },
+  A: { label: 'A โ€“ Approved', cls: 'bg-green-100 text-green-700' },
+  B: { label: 'B โ€“ Approved as Noted', cls: 'bg-teal-100 text-teal-700' },
+  C: { label: 'C โ€“ Revise & Resubmit', cls: 'bg-red-100 text-red-700' },
+  D: { label: 'D โ€“ Rejected', cls: 'bg-red-200 text-red-800' },
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -67,13 +73,111 @@ export default function DocumentRegisterPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [detailItem, setDetailItem] = useState<Document | null>(null)
 
+  // โ”€โ”€ Dynamic dropdown options (persisted per-project) โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+  const [dwgTypeOptions, setDwgTypeOptions] = useState<string[]>([])
+  const [detailStatusOptions, setDetailStatusOptions] = useState<string[]>([])
+  const [dwgTypeInput, setDwgTypeInput] = useState('')
+  const [detailStatusInput, setDetailStatusInput] = useState('')
+  const [dwgTypeOpen, setDwgTypeOpen] = useState(false)
+  const [detailStatusOpen, setDetailStatusOpen] = useState(false)
+  const dwgTypeRef = useRef<HTMLDivElement>(null)
+  const detailStatusRef = useRef<HTMLDivElement>(null)
+  const columnsMenuRef = useRef<HTMLDivElement>(null)
+  const [columnsMenuOpen, setColumnsMenuOpen] = useState(false)
+  const [columns, setColumns] = useState([
+    { id: 'documentNo', label: 'Document No.', visible: true },
+    { id: 'title', label: 'Title', visible: true },
+    { id: 'category', label: 'Category', visible: true },
+    { id: 'dwgType', label: 'DWG Type', visible: true },
+    { id: 'detailStatus', label: 'Detail Status', visible: true },
+    { id: 'revision', label: 'Rev.', visible: true },
+    { id: 'statusCode', label: 'Code', visible: true },
+    { id: 'status', label: 'Status', visible: true },
+    { id: 'updatedAt', label: 'Updated', visible: true },
+    { id: 'file', label: 'File', visible: true },
+    { id: 'actions', label: '', visible: true },
+  ])
+  const [draggedColumnIdx, setDraggedColumnIdx] = useState<number | null>(null)
+
   const canEditDelete = userProfile?.role === 'MasterAdmin' || userProfile?.role === 'Admin' || userProfile?.role === 'SiteAdmin'
 
   const lockPath = `CMG-cdms-DocControl/root/documents_${selectedProject?.projectId ?? 'none'}`
   const { acquireLock, releaseLock, forceReleaseLock, isLockedByOther, isLockedByMe, lockedByName } = useEditLock(lockPath)
 
   function openPanel() { forceReleaseLock(); setDocForm({ ...EMPTY_DOC_FORM }); setSaveError(null); setPanelOpen(true) }
-  function closePanel() { setPanelOpen(false); releaseLock() }
+  function closePanel() { setPanelOpen(false); setDwgTypeOpen(false); setDetailStatusOpen(false); releaseLock() }
+
+  // โ”€โ”€ Load dynamic options from Firestore โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+  useEffect(() => {
+    if (!selectedProject) return
+    if (USE_MOCK) return
+    let cancelled = false
+    Promise.all([import('firebase/firestore'), import('@/services/firebase')]).then(
+      ([{ doc, getDoc }, { db }]) => {
+        if (cancelled) return
+        getDoc(doc(db, DWG_TYPE_DOC(selectedProject.projectId))).then((snap) => {
+          if (cancelled) return
+          const data = snap.data()
+          if (data?.dwgTypeOptions) setDwgTypeOptions(data.dwgTypeOptions)
+          if (data?.detailStatusOptions) setDetailStatusOptions(data.detailStatusOptions)
+        })
+      }
+    )
+    return () => { cancelled = true }
+  }, [selectedProject])
+
+  // โ”€โ”€ Persist option lists โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+  async function saveOptions(dwgOpts: string[], detailOpts: string[]) {
+    if (!selectedProject || USE_MOCK) return
+    const [{ doc, setDoc }, { db }] = await Promise.all([
+      import('firebase/firestore'), import('@/services/firebase'),
+    ])
+    await setDoc(doc(db, DWG_TYPE_DOC(selectedProject.projectId)), {
+      dwgTypeOptions: dwgOpts,
+      detailStatusOptions: detailOpts,
+    }, { merge: true })
+  }
+
+  // โ”€โ”€ Add/remove helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+  function addDwgType() {
+    const v = dwgTypeInput.trim()
+    if (!v || dwgTypeOptions.includes(v)) return
+    const next = [...dwgTypeOptions, v]
+    setDwgTypeOptions(next)
+    setDwgTypeInput('')
+    saveOptions(next, detailStatusOptions)
+  }
+  function removeDwgType(opt: string) {
+    const next = dwgTypeOptions.filter((o) => o !== opt)
+    setDwgTypeOptions(next)
+    if (docForm.dwgType === opt) setDocForm((f) => ({ ...f, dwgType: '' }))
+    saveOptions(next, detailStatusOptions)
+  }
+  function addDetailStatus() {
+    const v = detailStatusInput.trim()
+    if (!v || detailStatusOptions.includes(v)) return
+    const next = [...detailStatusOptions, v]
+    setDetailStatusOptions(next)
+    setDetailStatusInput('')
+    saveOptions(dwgTypeOptions, next)
+  }
+  function removeDetailStatus(opt: string) {
+    const next = detailStatusOptions.filter((o) => o !== opt)
+    setDetailStatusOptions(next)
+    if (docForm.detailStatus === opt) setDocForm((f) => ({ ...f, detailStatus: '' }))
+    saveOptions(dwgTypeOptions, next)
+  }
+
+  // โ”€โ”€ Close dropdowns on outside click โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (columnsMenuRef.current && !columnsMenuRef.current.contains(e.target as Node)) setColumnsMenuOpen(false)
+      if (dwgTypeRef.current && !dwgTypeRef.current.contains(e.target as Node)) setDwgTypeOpen(false)
+      if (detailStatusRef.current && !detailStatusRef.current.contains(e.target as Node)) setDetailStatusOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
 
   useEffect(() => {
     if (!selectedProject) return
@@ -121,7 +225,7 @@ export default function DocumentRegisterPage() {
   async function handleSave() {
     if (!currentUser || !selectedProject) return
     if (!docForm.documentNo.trim() || !docForm.title.trim()) {
-      setSaveError('กรุณากรอก Document No. และ Title')
+      setSaveError('เธเธฃเธธเธ“เธฒเธเธฃเธญเธ Document No. เนเธฅเธฐ Title')
       return
     }
     setSaving(true); setSaveError(null)
@@ -139,6 +243,8 @@ export default function DocumentRegisterPage() {
         revision: docForm.revision.trim() || 'Rev.00',
         fileUrls: docForm.fileUrls,
         status: docForm.status,
+        dwgType: docForm.dwgType || '',
+        detailStatus: docForm.detailStatus || '',
         isLatest: true,
         createdBy: currentUser.uid,
         createdAt: now,
@@ -148,84 +254,118 @@ export default function DocumentRegisterPage() {
       closePanel()
     } catch (err) {
       console.error('Save document failed:', err)
-      setSaveError('บันทึกไม่สำเร็จ กรุณาลองใหม่')
+      setSaveError('เธเธฑเธเธ—เธถเธเนเธกเนเธชเธณเน€เธฃเนเธ เธเธฃเธธเธ“เธฒเธฅเธญเธเนเธซเธกเน')
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Document Register</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {latestCount} documents · <span className="font-medium text-gray-700">{selectedProject.name}</span>
-          </p>
+    <div className="flex flex-col h-full gap-1.5">
+      {/* Compact single-row toolbar */}
+      <div className="flex items-center gap-2 flex-wrap shrink-0">
+        <div className="flex items-baseline gap-2 shrink-0">
+          <h1 className="text-base font-bold text-gray-900">Document Register</h1>
+          <span className="text-xs text-gray-400">{latestCount} docs · <span className="font-medium text-gray-600">{selectedProject.name}</span></span>
         </div>
-        <Button className="flex items-center gap-2" onClick={openPanel}>
-          <Plus size={16} />
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Input
+            placeholder="Search by doc no., title, or category..."
+            className="pl-8 h-7 text-xs"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none whitespace-nowrap">
+          <input
+            type="checkbox"
+            className="rounded border-gray-300 text-blue-600 w-3.5 h-3.5"
+            checked={showSuperseded}
+            onChange={(e) => setShowSuperseded(e.target.checked)}
+          />
+          Show superseded
+        </label>
+        <Button variant="outline" className="h-7 px-2.5 gap-1.5 text-xs">
+          <Filter size={12} />
+          Filter
+        </Button>
+        <div className="relative" ref={columnsMenuRef}>
+          <Button variant="outline" className="h-7 px-2.5 gap-1.5 text-xs" onClick={() => setColumnsMenuOpen(!columnsMenuOpen)}>
+            <Columns size={12} />
+            Columns
+          </Button>
+          {columnsMenuOpen && (
+            <div className="absolute top-full right-0 mt-1 w-56 bg-white border border-gray-200 shadow-xl rounded-md z-50 flex flex-col py-1">
+              <div className="px-3 py-2 border-b border-gray-100 font-semibold text-xs text-gray-700">
+                Manage Columns
+              </div>
+              <div className="max-h-64 overflow-y-auto p-1">
+                {columns.map((col, idx) => (
+                  <div
+                    key={col.id}
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggedColumnIdx(idx)
+                      e.dataTransfer.effectAllowed = 'move'
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = 'move'
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      if (draggedColumnIdx === null || draggedColumnIdx === idx) return
+                      const next = [...columns]
+                      const [moved] = next.splice(draggedColumnIdx, 1)
+                      next.splice(idx, 0, moved)
+                      setColumns(next)
+                      setDraggedColumnIdx(null)
+                    }}
+                    className={`flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded text-xs cursor-move ${draggedColumnIdx === idx ? 'opacity-50 bg-gray-100' : ''}`}
+                  >
+                    <GripVertical size={12} className="text-gray-400" />
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={col.visible}
+                      onChange={(e) => {
+                        const next = [...columns]
+                        next[idx].visible = e.target.checked
+                        setColumns(next)
+                      }}
+                    />
+                    <span className="flex-1 truncate select-none text-gray-700">{col.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <Button className="flex items-center gap-1.5 h-7 px-3 text-xs shrink-0" onClick={openPanel}>
+          <Plus size={13} />
           Add Document
         </Button>
       </div>
 
-      {/* Filters */}
-      <Card className="border border-gray-200 shadow-sm">
-        <CardContent className="flex flex-wrap items-center gap-3 p-4">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Search by doc no., title, or category..."
-              className="pl-9 h-9 text-sm"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              className="rounded border-gray-300 text-blue-600"
-              checked={showSuperseded}
-              onChange={(e) => setShowSuperseded(e.target.checked)}
-            />
-            Show superseded
-          </label>
-          <Button variant="outline" className="h-9 gap-2 text-sm">
-            <Filter size={14} />
-            Filter
-          </Button>
-        </CardContent>
-      </Card>
-
       {/* Table */}
-      <Card className="border border-gray-200 shadow-sm">
-        <CardHeader className="pb-0 pt-4 px-5">
-          <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-            {data.length} document{data.length !== 1 ? 's' : ''}
-            {showSuperseded && ' (including superseded)'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0 mt-2">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-t border-gray-100 bg-gray-50">
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Document No.</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Title</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Rev.</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Code</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Updated</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">File</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
+      <Card className="border border-gray-200 shadow-sm flex-1 flex flex-col overflow-hidden">
+        <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
+          <div className="overflow-auto flex-1">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  {columns.filter(c => c.visible).map(c => (
+                    <th key={c.id} className="text-left px-3 py-1 font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                      {c.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {data.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-5 py-8 text-center text-sm text-gray-400">
+                    <td colSpan={columns.filter(c => c.visible).length} className="px-3 py-6 text-center text-xs text-gray-400">
                       No documents found.
                     </td>
                   </tr>
@@ -233,69 +373,46 @@ export default function DocumentRegisterPage() {
                   data.map((d) => (
                     <tr
                       key={d.documentId}
-                      className={`hover:bg-gray-50 transition-colors cursor-pointer select-none ${
-                        !d.isLatest ? 'opacity-50' : ''
-                      }`}
+                      className={`hover:bg-blue-50/40 transition-colors cursor-pointer select-none ${!d.isLatest ? 'opacity-50' : ''}`}
                       onDoubleClick={() => setDetailItem(d)}
                       title="Double-click to view details"
                     >
-                      <td className="px-5 py-3 font-mono text-xs font-medium text-blue-700">{d.documentNo}</td>
-                      <td className="px-5 py-3 text-gray-700 max-w-xs">
-                        <div className="truncate">{d.title}</div>
-                        {!d.isLatest && (
-                          <div className="text-xs text-gray-400 mt-0.5">Superseded</div>
-                        )}
-                      </td>
-                      <td className="px-5 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${CATEGORY_COLORS[d.category] ?? 'bg-gray-100 text-gray-600'}`}>
-                          {d.category}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 font-mono text-xs text-gray-700">{d.revision}</td>
-                      <td className="px-5 py-3">
-                        {d.statusCode ? (
-                          <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold ${STATUS_CODE_LABELS[d.statusCode]?.cls ?? 'bg-gray-100 text-gray-600'}`}>
-                            {d.statusCode}
-                          </span>
-                        ) : (
-                          <span className="text-gray-300 text-xs">—</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[d.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                          {d.status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-gray-500 whitespace-nowrap">
-                        {new Date(d.updatedAt.seconds * 1000).toLocaleDateString('en-GB')}
-                      </td>
-                      <td className="px-5 py-3">
-                        {(() => {
-                          const urls: string[] = (d as Document & { fileUrls?: string[] }).fileUrls
-                            ?? (d.fileUrl ? [d.fileUrl] : [])
-                          if (!urls.length) return <span className="text-gray-300 text-xs">—</span>
-                          return (
-                            <div className="flex flex-col gap-0.5">
-                              {urls.map((url, i) => (
-                                <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
-                                  <ExternalLink size={11} />{i + 1}
-                                </a>
-                              ))}
-                            </div>
+                      {columns.filter(c => c.visible).map(col => {
+                        switch (col.id) {
+                          case 'documentNo': return <td key={col.id} className="px-3 py-0.5 font-mono font-medium text-blue-700 whitespace-nowrap">{d.documentNo}</td>
+                          case 'title': return (
+                            <td key={col.id} className="px-3 py-0.5 text-gray-700 max-w-[240px]">
+                              <div className="truncate">{d.title}</div>
+                              {!d.isLatest && <div className="text-[10px] text-gray-400">Superseded</div>}
+                            </td>
                           )
-                        })()}
-                      </td>
-                      <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
-                        <a
-                          href={`mailto:?subject=${encodeURIComponent(`[${d.documentNo}] ${d.title}`)}&body=${encodeURIComponent(`Document No.: ${d.documentNo}\nTitle: ${d.title}\nCategory: ${d.category}\nRevision: ${d.revision}\nStatus: ${d.status}\nUpdated: ${new Date(d.updatedAt.seconds * 1000).toLocaleDateString('en-GB')}`)}`}
-                          title="Send email"
-                          className="inline-flex items-center justify-center w-7 h-7 rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                        >
-                          <Mail size={14} />
-                        </a>
-                      </td>
+                          case 'category': return <td key={col.id} className="px-3 py-0.5"><span className={`inline-flex px-1.5 py-px rounded font-medium ${CATEGORY_COLORS[d.category] ?? 'bg-gray-100 text-gray-600'}`}>{d.category}</span></td>
+                          case 'dwgType': return <td key={col.id} className="px-3 py-0.5">{d.dwgType ? <span className="inline-flex px-1.5 py-px rounded text-xs font-medium bg-purple-100 text-purple-700">{d.dwgType}</span> : <span className="text-gray-300">—</span>}</td>
+                          case 'detailStatus': return <td key={col.id} className="px-3 py-0.5">{d.detailStatus ? <span className="inline-flex px-1.5 py-px rounded font-medium bg-emerald-100 text-emerald-700">{d.detailStatus}</span> : <span className="text-gray-300">—</span>}</td>
+                          case 'revision': return <td key={col.id} className="px-3 py-0.5 font-mono text-gray-700 whitespace-nowrap">{d.revision}</td>
+                          case 'statusCode': return <td key={col.id} className="px-3 py-0.5">{d.statusCode ? <span className={`inline-flex px-1.5 py-px rounded font-bold ${STATUS_CODE_LABELS[d.statusCode]?.cls ?? 'bg-gray-100 text-gray-600'}`}>{d.statusCode}</span> : <span className="text-gray-300">—</span>}</td>
+                          case 'status': return <td key={col.id} className="px-3 py-0.5"><span className={`inline-flex px-1.5 py-px rounded font-medium ${STATUS_COLORS[d.status] ?? 'bg-gray-100 text-gray-600'}`}>{d.status}</span></td>
+                          case 'updatedAt': return <td key={col.id} className="px-3 py-0.5 text-gray-500 whitespace-nowrap">{new Date(d.updatedAt.seconds * 1000).toLocaleDateString('en-GB')}</td>
+                          case 'file': {
+                            const urls: string[] = (d as Document & { fileUrls?: string[] }).fileUrls ?? (d.fileUrl ? [d.fileUrl] : [])
+                            return (
+                              <td key={col.id} className="px-3 py-0.5 text-center">
+                                {urls.length > 0 ? (
+                                  <span className="text-gray-600 font-medium">{urls.length}</span>
+                                ) : (
+                                  <span className="text-gray-300">—</span>
+                                )}
+                              </td>
+                            )
+                          }
+                          case 'actions': return (
+                            <td key={col.id} className="px-3 py-0.5" onClick={(e) => e.stopPropagation()}>
+                              <a href={`mailto:?subject=${encodeURIComponent(`[${d.documentNo}] ${d.title}`)}&body=${encodeURIComponent(`Document No.: ${d.documentNo}\nTitle: ${d.title}\nCategory: ${d.category}\nRevision: ${d.revision}\nStatus: ${d.status}\nUpdated: ${new Date(d.updatedAt.seconds * 1000).toLocaleDateString('en-GB')}`)}`} title="Send email" className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Mail size={12} /></a>
+                            </td>
+                          )
+                          default: return null;
+                        }
+                      })}
                     </tr>
                   ))
                 )}
@@ -361,6 +478,64 @@ export default function DocumentRegisterPage() {
                     {DOC_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-gray-700">DWG Type</label>
+                  <div ref={dwgTypeRef} className="relative">
+                    <button type="button" disabled={saving} onClick={() => setDwgTypeOpen((v) => !v)}
+                      className="w-full h-9 text-sm border border-gray-200 rounded-md px-2 pr-8 bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between disabled:opacity-50">
+                      <span className={docForm.dwgType ? 'text-gray-800' : 'text-gray-400'}>{docForm.dwgType || 'Select...'}</span>
+                      <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                    </button>
+                    {dwgTypeOpen && (
+                      <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+                        {dwgTypeOptions.length === 0 && <p className="px-3 py-2 text-xs text-gray-400">No options yet. Add below.</p>}
+                        {dwgTypeOptions.map((opt) => (
+                          <div key={opt} className="flex items-center justify-between px-3 py-1.5 hover:bg-gray-50 group">
+                            <button type="button" onClick={() => { setDocForm((f) => ({ ...f, dwgType: opt })); setDwgTypeOpen(false) }}
+                              className={['flex-1 text-left text-sm', docForm.dwgType === opt ? 'font-semibold text-blue-600' : 'text-gray-700'].join(' ')}>{opt}</button>
+                            <button type="button" onClick={() => removeDwgType(opt)}
+                              className="ml-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Remove option"><Trash2 size={12} /></button>
+                          </div>
+                        ))}
+                        <div className="flex items-center gap-1 px-3 pt-2 pb-1 border-t border-gray-100 mt-1">
+                          <input value={dwgTypeInput} onChange={(e) => setDwgTypeInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addDwgType())}
+                            placeholder="New option…" className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                          <button type="button" onClick={addDwgType} className="p-1 rounded bg-blue-600 text-white hover:bg-blue-700" title="Add option"><Plus size={12} /></button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-gray-700">Detail Status</label>
+                  <div ref={detailStatusRef} className="relative">
+                    <button type="button" disabled={saving} onClick={() => setDetailStatusOpen((v) => !v)}
+                      className="w-full h-9 text-sm border border-gray-200 rounded-md px-2 pr-8 bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between disabled:opacity-50">
+                      <span className={docForm.detailStatus ? 'text-gray-800' : 'text-gray-400'}>{docForm.detailStatus || 'Select...'}</span>
+                      <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                    </button>
+                    {detailStatusOpen && (
+                      <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+                        {detailStatusOptions.length === 0 && <p className="px-3 py-2 text-xs text-gray-400">No options yet. Add below.</p>}
+                        {detailStatusOptions.map((opt) => (
+                          <div key={opt} className="flex items-center justify-between px-3 py-1.5 hover:bg-gray-50 group">
+                            <button type="button" onClick={() => { setDocForm((f) => ({ ...f, detailStatus: opt })); setDetailStatusOpen(false) }}
+                              className={['flex-1 text-left text-sm', docForm.detailStatus === opt ? 'font-semibold text-blue-600' : 'text-gray-700'].join(' ')}>{opt}</button>
+                            <button type="button" onClick={() => removeDetailStatus(opt)}
+                              className="ml-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Remove option"><Trash2 size={12} /></button>
+                          </div>
+                        ))}
+                        <div className="flex items-center gap-1 px-3 pt-2 pb-1 border-t border-gray-100 mt-1">
+                          <input value={detailStatusInput} onChange={(e) => setDetailStatusInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addDetailStatus())}
+                            placeholder="New option…" className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                          <button type="button" onClick={addDetailStatus} className="p-1 rounded bg-emerald-600 text-white hover:bg-emerald-700" title="Add option"><Plus size={12} /></button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <div className="space-y-1.5 col-span-2">
                   <label className="text-sm font-medium text-gray-700">Transmittal ID <span className="text-gray-400 font-normal text-xs">(optional)</span></label>
                   <Input value={docForm.transmittalId} onChange={(e) => setDocForm((f) => ({ ...f, transmittalId: e.target.value }))}
@@ -379,7 +554,7 @@ export default function DocumentRegisterPage() {
             <div className="px-5 py-4 border-t border-gray-200 flex gap-3 shrink-0">
               <Button variant="outline" className="flex-1" onClick={closePanel} disabled={saving}>Cancel</Button>
               <Button className="flex-1" onClick={handleSave} disabled={saving}>
-                {saving ? <><Loader2 size={15} className="mr-2 animate-spin" />Saving…</> : 'Save Document'}
+                {saving ? <><Loader2 size={15} className="mr-2 animate-spin" />Savingโ€ฆ</> : 'Save Document'}
               </Button>
             </div>
           </div>
