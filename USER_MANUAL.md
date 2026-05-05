@@ -109,7 +109,7 @@ Architecture: SPA (Single Page Application)
 uid              string   — Firebase Auth UID (= Document ID)
 email            string   — อีเมล
 displayName      string   — ชื่อแสดง
-role             string   — MasterAdmin | Admin | Manager | Engineer | Viewer
+role             string   — MasterAdmin | SiteAdmin | Admin | Manager | Engineer | Viewer
 isActive         boolean  — สถานะ Active
 status           string   — active | pending | disabled
 assignedProjectIds  string[]  — รหัสโครงการที่ได้รับสิทธิ์
@@ -157,12 +157,15 @@ title            string   — ชื่อเอกสาร
 category         string   — Drawing | Specification | Material Approval |
                             Method Statement | Report | Correspondence | Other
 revision         string   — Rev.00, Rev.01, Rev.02, ...
-fileUrl          string   — Firebase Storage URL
+fileUrl          string   — Firebase Storage URL (deprecated, ใช้ fileUrls)
+fileUrls         string[] — URLs ไฟล์แนบหลายไฟล์ (รองรับหลายไฟล์)
 status           string   — Draft | Submitted | Under Review | Approved |
                             Approved as Noted | Revise and Resubmit | Rejected | Superseded
 isLatest         boolean  — true = Revision ปัจจุบัน, false = ถูกแทนที่แล้ว
 statusCode       string?  — A | B | C | D (ผลการตรวจสอบ)
 reviewComment    string?  — ความคิดเห็นจาก Reviewer
+dwgType          string?  — ประเภท Drawing (เช่น Plan, Section, Detail) — กำหนดเองได้
+detailStatus     string?  — สถานะรายละเอียด (เช่น In Progress, Completed) — กำหนดเองได้
 createdBy        string   — UID ผู้สร้าง
 createdAt        Timestamp
 updatedBy        string   — UID ผู้แก้ไขล่าสุด
@@ -193,27 +196,27 @@ newRevision      string?  — Revision ใหม่
 
 ### 4.1 ตารางสิทธิ์ตาม Role
 
-| Module / เมนู | MasterAdmin | Admin | Manager | Engineer | Viewer |
-|---------------|:-----------:|:-----:|:-------:|:--------:|:------:|
-| Dashboard | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Transmittal In | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Transmittal Out | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Document Register | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Project Management | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Settings | ✅ | ✅ | ❌ | ❌ | ❌ |
-| User Management | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Module / เมนู | MasterAdmin | SiteAdmin | Admin | Manager | Engineer | Viewer |
+|---------------|:-----------:|:---------:|:-----:|:-------:|:--------:|:------:|
+| Dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Transmittal In | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Transmittal Out | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Document Register | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Project Management | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Settings | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| User Management | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 ### 4.2 สิทธิ์การเขียนข้อมูล (Write Permissions)
 
-| การดำเนินการ | MasterAdmin | Admin | Manager | Engineer | Viewer |
-|-------------|:-----------:|:-----:|:-------:|:--------:|:------:|
-| สร้าง Transmittal ใหม่ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| สร้าง Document ใหม่ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| แก้ไข/ลบ Transmittal | ✅ | ✅ | ❌ | ❌ | ❌ |
-| แก้ไข/ลบ Document | ✅ | ✅ | ❌ | ❌ | ❌ |
-| สร้างโครงการ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Approve/Disable User | ✅ | ❌ | ❌ | ❌ | ❌ |
-| กำหนด Role ผู้ใช้ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| การดำเนินการ | MasterAdmin | SiteAdmin | Admin | Manager | Engineer | Viewer |
+|-------------|:-----------:|:---------:|:-----:|:-------:|:--------:|:------:|
+| สร้าง Transmittal ใหม่ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| สร้าง Document ใหม่ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| แก้ไข/ลบ Transmittal | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| แก้ไข/ลบ Document | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| สร้างโครงการ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Approve/Disable User | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| กำหนด Role ผู้ใช้ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 ### 4.3 คำอธิบาย Role
 
@@ -222,9 +225,16 @@ newRevision      string?  — Revision ใหม่
 - จัดการ User (Approve, Disable, เปลี่ยน Role, ลบ)
 - กำหนดโครงการให้แต่ละ User
 
+**SiteAdmin**
+- ผู้ดูแลระบบระดับ Site มีสิทธิ์เทียบเท่า Admin
+- แก้ไข/ลบ Transmittal และ Document ได้
+- เข้าถึงเมนู Projects และ Settings ได้
+- ไม่สามารถจัดการ User ได้ (เหมือน Admin)
+
 **Admin**
 - ผู้ดูแลโครงการ มีสิทธิ์ทุกอย่างยกเว้น User Management
 - แก้ไข/ลบ Transmittal และ Document ได้
+- เข้าถึงเมนู Projects และ Settings ได้
 
 **Manager**
 - ผู้จัดการโครงการ สร้างข้อมูลได้ แต่ไม่สามารถลบหรือแก้ไขได้
@@ -340,9 +350,9 @@ Firebase Google Popup
 **Summary Cards (4 การ์ด)**
 | การ์ด | ข้อมูล |
 |-------|--------|
+| Total Documents | จำนวนเอกสารทั้งหมด (Latest Revision เท่านั้น) |
 | Transmittals In | จำนวน Transmittal ขาเข้าทั้งหมด |
 | Transmittals Out | จำนวน Transmittal ขาออกทั้งหมด |
-| Documents | จำนวนเอกสาร (Latest Revision) |
 | Pending Reply | จำนวน Transmittal ที่รอ Reply (requiresReply = true, status ≠ Closed) |
 
 **ตาราง Recent Transmittals**
@@ -598,7 +608,7 @@ Document Rev.00 ถูกอัพเดท:
 สร้างและดูโครงการทั้งหมดในระบบ
 
 ### 10.2 สิทธิ์การเข้าถึง
-**MasterAdmin, Admin, Manager** เท่านั้น
+**MasterAdmin, SiteAdmin, Admin, Manager** เท่านั้น
 
 ### 10.3 Workflow การสร้างโครงการ
 
@@ -670,7 +680,7 @@ Project Selector ใน Sidebar อัพเดทอัตโนมัติ
 
 ### 10.6 Workflow แก้ไขโครงการ (Edit)
 
-สำหรับ **MasterAdmin, Admin, Manager** เท่านั้น:
+สำหรับ **MasterAdmin, SiteAdmin, Admin, Manager** เท่านั้น:
 
 ```
 Hover บน Project Card → ปุ่ม ✏️ ปรากฏมุมขวา
@@ -689,7 +699,7 @@ Hover บน Project Card → ปุ่ม ✏️ ปรากฏมุมขว
 
 ### 10.7 Workflow ลบโครงการ (Delete)
 
-สำหรับ **MasterAdmin, Admin, Manager** เท่านั้น:
+สำหรับ **MasterAdmin, SiteAdmin, Admin, Manager** เท่านั้น:
 
 ```
 Hover บน Project Card → กดปุ่ม 🗑️
@@ -800,7 +810,7 @@ Dialog ยืนยัน: "Delete [ชื่อ User]?"
 ## 12. Settings (ตั้งค่า)
 
 ### 12.1 สิทธิ์การเข้าถึง
-**MasterAdmin และ Admin** เท่านั้น
+**MasterAdmin, SiteAdmin และ Admin** เท่านั้น
 
 ### 12.2 ฟีเจอร์
 - ตั้งค่าโปรไฟล์ผู้ใช้งาน (Display Name, รูปโปรไฟล์)
@@ -981,7 +991,7 @@ User A: เปิด Transmittal In Form → ระบบ Lock
 หัวข้อนี้อธิบายกระบวนการทำงานทั้งหมดในระบบ **ทีละขั้นตอน** พร้อมระบุว่า **ใคร** เป็นผู้ดำเนินการในแต่ละขั้น
 
 > **สัญลักษณ์ Role:**  
-> 🔴 MasterAdmin &nbsp;|&nbsp; 🔵 Admin &nbsp;|&nbsp; 🟢 Manager &nbsp;|&nbsp; 🟡 Engineer &nbsp;|&nbsp; ⚪ Viewer (ดูได้อย่างเดียว)
+> 🔴 MasterAdmin &nbsp;|&nbsp; � SiteAdmin &nbsp;|&nbsp; � Admin &nbsp;|&nbsp; 🟢 Manager &nbsp;|&nbsp; 🟡 Engineer &nbsp;|&nbsp; ⚪ Viewer (ดูได้อย่างเดียว)
 
 ---
 
@@ -1007,8 +1017,8 @@ User A: เปิด Transmittal In Form → ระบบ Lock
           │  ► เห็น Badge สีส้ม (pending) ใน Sidebar ข้างเมนู Users
           │  ► เข้าหน้า /users
           │  ► ตรวจสอบตัวตน ผู้ใช้ใหม่
-          │  ► เลือก Role ที่เหมาะสม (Admin / Manager / Engineer / Viewer)
-          │  ► กำหนดโครงการที่เข้าถึงได้ (สำหรับ Manager/Engineer/Viewer)
+          │  ► เลือก Role ที่เหมาะสม (🟣 SiteAdmin / 🔵 Admin / 🟢 Manager / 🟡 Engineer / ⚪ Viewer)
+          │  ► กำหนดโครงการที่เข้าถึงได้ (สำหรับ 🟢 Manager/🟡 Engineer/⚪ Viewer)
           │  ► กด "Approve"
           ▼
 ขั้นที่ 4 │ ระบบ
@@ -1025,10 +1035,10 @@ User A: เปิด Transmittal In Form → ระบบ Lock
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │  กระบวนการ: สร้างโครงการใหม่                                   │
-│  ผู้เกี่ยวข้อง: 🔴 MasterAdmin / 🔵 Admin / 🟢 Manager          │
+│  ผู้เกี่ยวข้อง: 🔴 MasterAdmin / 🟣 SiteAdmin / 🔵 Admin / 🟢 Manager    │
 └────────────────────────────────────────────────────────────────┘
 
-ขั้นที่ 1 │ 🔴🔵🟢 ผู้มีสิทธิ์
+ขั้นที่ 1 │ 🔴🟣🔵🟢 ผู้มีสิทธิ์
           │  ► เข้าเมนู Project Management (/projects)
           │  ► กรอก Project Name (บังคับ, 3-100 ตัวอักษร)
           │  ► กรอก Description (ไม่บังคับ)
@@ -1046,8 +1056,9 @@ User A: เปิด Transmittal In Form → ระบบ Lock
           ▼
 ขั้นที่ 4 │ 🔴 MasterAdmin
           │  ► กำหนด User ที่มีสิทธิ์เข้าถึงโครงการนี้
-          │  ► เข้าหน้า User Management → เปิด Projects Dropdown
+          │  ► เข้าหน้า User Management → เปิด Projects Dropdown ของแต่ละ User
           │  ► ติ๊ก Checkbox โครงการใหม่ให้ User ที่เกี่ยวข้อง
+          │  หมายเหตุ: MasterAdmin, SiteAdmin, Admin เห็นทุกโครงการอัตโนมัติ
           ▼
 สิ้นสุด   │  โครงการพร้อมใช้งาน
 ```
@@ -1059,15 +1070,15 @@ User A: เปิด Transmittal In Form → ระบบ Lock
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │  กระบวนการ: รับเอกสาร (Transmittal In)                        │
-│  ผู้เกี่ยวข้อง: 🔵 Admin / 🟢 Manager / 🟡 Engineer             │
+│  ผู้เกี่ยวข้อง: 🟣 SiteAdmin / 🔵 Admin / 🟢 Manager / 🟡 Engineer    │
 └────────────────────────────────────────────────────────────────┘
 
-ขั้นที่ 1 │ 🔵🟢🟡 เจ้าหน้าที่รับเอกสาร
+ขั้นที่ 1 │ ��🟢🟡 เจ้าหน้าที่รับเอกสาร
           │  ► ได้รับเอกสารจากภายนอก (Email, ส่งมือ, Courier)
           │  ► เข้าเมนู Transmittal In (/transmittal-in)
           │  ► กด "+ New Transmittal"
           ▼
-ขั้นที่ 2 │ 🔵🟢🟡 กรอกข้อมูล
+ขั้นที่ 2 │ ��🟢🟡 กรอกข้อมูล
           │  ► Transmittal No. * (บังคับ) เช่น TR-IN-26-001
           │  ► Sender *             ชื่อหน่วยงานที่ส่งมา
           │  ► Recipient            ชื่อผู้รับ (ฝ่ายเรา)
@@ -1086,7 +1097,7 @@ User A: เปิด Transmittal In Form → ระบบ Lock
           │  ► หาก requiresReply=true:
           │      Dashboard: "Pending Reply" เพิ่มขึ้น
           ▼
-ขั้นที่ 4 │ 🔵🟢 ผู้รับผิดชอบ (ถ้ามีไฟล์แนบ)
+ขั้นที่ 4 │ ��🟢 ผู้รับผิดชอบ (ถ้ามีไฟล์แนบ)
           │  ► คลิก Link ไฟล์ในคอลัมน์ File เพื่อดาวน์โหลด
           │  ► กด Icon อีเมล (✉️) เพื่อส่ง Forward ต่อทางอีเมล
           ▼
@@ -1100,15 +1111,15 @@ User A: เปิด Transmittal In Form → ระบบ Lock
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │  กระบวนการ: ส่งเอกสาร (Transmittal Out)                       │
-│  ผู้เกี่ยวข้อง: 🔵 Admin / 🟢 Manager / 🟡 Engineer             │
+│  ผู้เกี่ยวข้อง: 🟣 SiteAdmin / 🔵 Admin / 🟢 Manager / 🟡 Engineer    │
 └────────────────────────────────────────────────────────────────┘
 
-ขั้นที่ 1 │ 🟡 Engineer / 🟢 Manager
+ขั้นที่ 1 │ 🟡 Engineer / 🟢 Manager / 🟣 SiteAdmin / 🔵 Admin
           │  ► เตรียมเอกสารที่จะส่ง (ไฟล์ PDF พร้อมแล้ว)
           │  ► เข้าเมนู Transmittal Out (/transmittal-out)
           │  ► กด "+ New Transmittal"
           ▼
-ขั้นที่ 2 │ 🟡🟢 กรอกข้อมูล
+ขั้นที่ 2 │ 🟡🟢🟣🔵 กรอกข้อมูล
           │  ► Transmittal No. * เช่น TR-OUT-26-001
           │  ► Sender *         ชื่อหน่วยงานเรา
           │  ► Recipient        ชื่อหน่วยงานปลายทาง
@@ -1127,7 +1138,7 @@ User A: เปิด Transmittal In Form → ระบบ Lock
           │  ► ปรากฏในตาราง Transmittal Out ทันที
           │  ► Dashboard: "Transmittals Out" เพิ่มขึ้น
           ▼
-ขั้นที่ 4 │ 🟡🟢 ผู้ส่ง
+ขั้นที่ 4 │ 🟡🟢🟣🔵 ผู้ส่ง
           │  ► กด Icon ✉️ เพื่อ copy ข้อมูล Transmittal ส่งทางอีเมล
           │  ► แนบไฟล์จาก Link ในระบบ
           ▼
@@ -1141,14 +1152,14 @@ User A: เปิด Transmittal In Form → ระบบ Lock
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │  กระบวนการ: บันทึกเอกสารใหม่ใน Document Register              │
-│  ผู้เกี่ยวข้อง: 🔵 Admin / 🟢 Manager / 🟡 Engineer             │
+│  ผู้เกี่ยวข้อง: 🟣 SiteAdmin / 🔵 Admin / 🟢 Manager / 🟡 Engineer    │
 └────────────────────────────────────────────────────────────────┘
 
-ขั้นที่ 1 │ 🟡 Engineer
+ขั้นที่ 1 │ 🟡 Engineer / 🟣 SiteAdmin / 🔵 Admin / 🟢 Manager
           │  ► เข้าเมนู Document Register (/documents)
           │  ► กด "+ Add Document"
           ▼
-ขั้นที่ 2 │ 🟡 กรอกข้อมูล
+ขั้นที่ 2 │ 🟡🟣🔵🟢 กรอกข้อมูล
           │  ► Document No. *  เช่น STR-DWG-001
           │  ► Revision        Rev.00 (default)
           │  ► Title *         ชื่อเอกสาร
@@ -1176,7 +1187,7 @@ User A: เปิด Transmittal In Form → ระบบ Lock
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │  กระบวนการ: ตรวจสอบและอนุมัติเอกสาร                           │
-│  ผู้เกี่ยวข้อง: 🟡 Engineer → 🔵 Admin/🟢 Manager → Client    │
+│  ผู้เกี่ยวข้อง: 🟡 Engineer → � SiteAdmin / � Admin / 🟢 Manager → Client │
 └────────────────────────────────────────────────────────────────┘
 
   ┌── ฝั่ง Engineer (ผู้ส่ง) ──────────────────────────────────┐
@@ -1199,11 +1210,11 @@ User A: เปิด Transmittal In Form → ระบบ Lock
                               ▼
   ┌── ฝั่ง Admin / Manager (ผู้บันทึกผล) ──────────────────────┐
   │                                                              │
-ขั้นที่ 3 │ 🔵 Admin / 🟢 Manager                                 │
-          │  ► สร้าง Transmittal In (บันทึกเอกสาร Reply)         │
+ขั้นที่ 3 │ � SiteAdmin / � Admin / 🟢 Manager
+          │  ► สร้าง Transmittal In (บันทึกเอกสาร Reply)
           │  ► แนบไฟล์คำตอบ / Comment จาก Client                │
           ▼                                                       │
-ขั้นที่ 4 │ 🔵 Admin / 🟢 Manager                                 │
+ขั้นที่ 4 │ 🟣 SiteAdmin / 🔵 Admin / 🟢 Manager
           │  ► เปิด Document Register ค้นหาเอกสารที่เกี่ยวข้อง   │
           │  ► อัพเดท Status และ Status Code:                    │
           │                                                       │
@@ -1241,17 +1252,17 @@ User A: เปิด Transmittal In Form → ระบบ Lock
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │  กระบวนการ: Revision Cycle (เมื่อได้รับ Code C)               │
-│  ผู้เกี่ยวข้อง: 🔵 Admin / 🟢 Manager → 🟡 Engineer            │
+│  ผู้เกี่ยวข้อง: 🟣 SiteAdmin / 🔵 Admin / 🟢 Manager → 🟡 Engineer       │
 └────────────────────────────────────────────────────────────────┘
 
-ขั้นที่ 1 │ 🔵 Admin / 🟢 Manager
+ขั้นที่ 1 │ � SiteAdmin / � Admin / 🟢 Manager
           │  ► ได้รับ Code C จากผู้ตรวจสอบ
           │  ► บันทึก Transmittal In (รับ Reply)
           │  ► อัพเดท Document: statusCode = "C"
           │  ► อัพเดท Document: status = "Revise and Resubmit"
           │  ► อัพเดท Document: isLatest = false (กลาย Superseded)
           ▼
-ขั้นที่ 2 │ 🔵 Admin / 🟢 Manager
+ขั้นที่ 2 │ 🟣 SiteAdmin / 🔵 Admin / 🟢 Manager
           │  ► สร้าง Document ใหม่ใน Document Register:
           │      documentNo: เดิม (เช่น STR-DWG-001)
           │      revision:   Rev.01 (เพิ่มขึ้น 1)
@@ -1280,7 +1291,7 @@ User A: เปิด Transmittal In Form → ระบบ Lock
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │  กระบวนการ: ปิด Transmittal (Closed)                          │
-│  ผู้เกี่ยวข้อง: 🔵 Admin / 🟢 Manager                          │
+│  ผู้เกี่ยวข้อง: 🟣 SiteAdmin / 🔵 Admin / 🟢 Manager                     │
 └────────────────────────────────────────────────────────────────┘
 
 เงื่อนไขที่ควร Close Transmittal:
@@ -1288,7 +1299,7 @@ User A: เปิด Transmittal In Form → ระบบ Lock
   ► ไม่ต้องการ Reply เพิ่มเติม
   ► ครบกำหนด หรือยกเลิก
 
-ขั้นที่ 1 │ 🔵 Admin / 🟢 Manager
+ขั้นที่ 1 │ � SiteAdmin / �� Admin / 🟢 Manager
           │  ► เข้าตาราง Transmittal In หรือ Out
           │  ► ค้นหา Transmittal ที่ต้องการปิด
           │  ► (ปัจจุบัน: อัพเดท Status ในฟอร์ม เป็น "Closed")
@@ -1308,10 +1319,10 @@ User A: เปิด Transmittal In Form → ระบบ Lock
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │  กระบวนการ: แก้ไขโครงการ                                      │
-│  ผู้เกี่ยวข้อง: 🔴 MasterAdmin / 🔵 Admin / 🟢 Manager          │
+│  ผู้เกี่ยวข้อง: 🔴 MasterAdmin / 🟣 SiteAdmin / 🔵 Admin / 🟢 Manager    │
 └────────────────────────────────────────────────────────────────┘
 
-ขั้นที่ 1 │ 🔴🔵🟢 ผู้มีสิทธิ์
+ขั้นที่ 1 │ 🔴🟣🔵🟢 ผู้มีสิทธิ์
           │  ► เข้าหน้า Project Management
           │  ► Hover เม้าส์บน Project Card ที่ต้องการแก้ไข
           │  ► กดปุ่ม ✏️ (Pencil)
@@ -1321,7 +1332,7 @@ User A: เปิด Transmittal In Form → ระบบ Lock
           │  ► Project Name และ Description ถูก pre-fill
           │  ► Project Card แสดง Badge "Editing"
           ▼
-ขั้นที่ 3 │ 🔴🔵🟢 ผู้แก้ไข
+ขั้นที่ 3 │ 🔴��🔵🟢 ผู้แก้ไข
           │  ► แก้ไข Name และ/หรือ Description
           │  ► กด "Save Changes"
           ▼
@@ -1343,10 +1354,10 @@ User A: เปิด Transmittal In Form → ระบบ Lock
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │  กระบวนการ: ลบโครงการ                                         │
-│  ผู้เกี่ยวข้อง: 🔴 MasterAdmin / 🔵 Admin / 🟢 Manager          │
+│  ผู้เกี่ยวข้อง: 🔴 MasterAdmin / 🟣 SiteAdmin / 🔵 Admin / 🟢 Manager    │
 └────────────────────────────────────────────────────────────────┘
 
-ขั้นที่ 1 │ 🔴🔵🟢 ผู้มีสิทธิ์
+ขั้นที่ 1 │ 🔴🟣🔵🟢 ผู้มีสิทธิ์
           │  ► Hover บน Project Card ที่ต้องการลบ
           │  ► กดปุ่ม 🗑️ (Trash)
           ▼
@@ -1355,7 +1366,7 @@ User A: เปิด Transmittal In Form → ระบบ Lock
           │      "ต้องการลบโครงการ [ชื่อ] ใช่หรือไม่?"
           │      ⚠️ การลบจะไม่ลบ Transmittal และ Document
           ▼
-ขั้นที่ 3 │ 🔴🔵🟢 ผู้มีสิทธิ์
+ขั้นที่ 3 │ 🔴���🟢 ผู้มีสิทธิ์
           │  ► กด "Delete" เพื่อยืนยัน
           ▼
 ขั้นที่ 4 │ ระบบ
@@ -1425,23 +1436,23 @@ User A: เปิด Transmittal In Form → ระบบ Lock
 
 ### 16.12 ตารางสรุป: ใครทำอะไรได้บ้าง
 
-| กระบวนการ | 🔴 MasterAdmin | 🔵 Admin | 🟢 Manager | 🟡 Engineer | ⚪ Viewer |
-|-----------|:-:|:-:|:-:|:-:|:-:|
-| Sign in / Register | ✅ | ✅ | ✅ | ✅ | ✅ |
-| ดู Dashboard | ✅ | ✅ | ✅ | ✅ | ✅ |
-| สร้าง Transmittal In/Out | ✅ | ✅ | ✅ | ✅ | ❌ |
-| ดู Transmittal In/Out | ✅ | ✅ | ✅ | ✅ | ✅ |
-| บันทึก Document | ✅ | ✅ | ✅ | ✅ | ❌ |
-| ดู Document | ✅ | ✅ | ✅ | ✅ | ✅ |
-| อัพเดทสถานะ Document | ✅ | ✅ | ✅ | ✅ | ❌ |
-| สร้างโครงการ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| แก้ไข/ลบโครงการ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Approve User | ✅ | ❌ | ❌ | ❌ | ❌ |
-| เปลี่ยน Role | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Disable/Enable User | ✅ | ❌ | ❌ | ❌ | ❌ |
-| กำหนดโครงการให้ User | ✅ | ❌ | ❌ | ❌ | ❌ |
-| ลบ User | ✅ | ❌ | ❌ | ❌ | ❌ |
-| เข้า Settings | ✅ | ✅ | ❌ | ❌ | ❌ |
+| กระบวนการ | 🔴 MasterAdmin | 🟣 SiteAdmin | 🔵 Admin | 🟢 Manager | 🟡 Engineer | ⚪ Viewer |
+|-----------|:-:|:-:|:-:|:-:|:-:|:-:|
+| Sign in / Register | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| ดู Dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| สร้าง Transmittal In/Out | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| ดู Transmittal In/Out | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| บันทึก Document | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| ดู Document | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| อัพเดทสถานะ Document | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| สร้างโครงการ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| แก้ไข/ลบโครงการ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Approve User | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| เปลี่ยน Role | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Disable/Enable User | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| กำหนดโครงการให้ User | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| ลบ User | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| เข้า Settings | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
 
 ---
 
