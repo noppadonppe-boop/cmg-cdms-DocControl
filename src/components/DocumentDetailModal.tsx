@@ -1,9 +1,12 @@
-import { useState } from 'react'
-import { X, Pencil, Trash2, Loader2, ExternalLink, Save } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { X, Pencil, Trash2, Loader2, ExternalLink, Save, ChevronDown, Plus } from 'lucide-react'
 import FileUploadField from '@/components/FileUploadField'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { Document, DocumentCategory, DocumentStatus, StatusCode } from '@/types'
+
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
+const PROJECT_SETTINGS_DOC = (projectId: string) => `CMG-cdms-DocControl/root/project_settings/${projectId}`
 
 /** Extract a human-readable filename from a Firebase Storage URL */
 function fileNameFromUrl(url: string): string {
@@ -70,13 +73,22 @@ export default function DocumentDetailModal({
   onClose,
   onDeleted,
 }: Props) {
+  const [documentState, setDocumentState] = useState<Document & { fileUrls?: string[] }>(d)
   const [mode, setMode] = useState<'view' | 'edit'>('view')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [dwgTypeOptions, setDwgTypeOptions] = useState<string[]>([])
+  const [detailStatusOptions, setDetailStatusOptions] = useState<string[]>([])
+  const [dwgTypeInput, setDwgTypeInput] = useState('')
+  const [detailStatusInput, setDetailStatusInput] = useState('')
+  const [dwgTypeOpen, setDwgTypeOpen] = useState(false)
+  const [detailStatusOpen, setDetailStatusOpen] = useState(false)
+  const dwgTypeRef = useRef<HTMLDivElement>(null)
+  const detailStatusRef = useRef<HTMLDivElement>(null)
 
-  const fileUrls: string[] = d.fileUrls ?? (d.fileUrl ? [d.fileUrl] : [])
+  const fileUrls: string[] = documentState.fileUrls ?? (documentState.fileUrl ? [documentState.fileUrl] : [])
 
   const [form, setForm] = useState({
     documentNo: d.documentNo,
@@ -87,8 +99,88 @@ export default function DocumentDetailModal({
     statusCode: d.statusCode ?? '',
     reviewComment: d.reviewComment ?? '',
     transmittalId: d.transmittalId ?? '',
+    dwgType: d.dwgType ?? '',
+    detailStatus: d.detailStatus ?? '',
     fileUrls,
   })
+
+  useEffect(() => {
+    setDocumentState(d)
+  }, [d])
+
+  useEffect(() => {
+    if (USE_MOCK) return
+    let cancelled = false
+
+    Promise.all([import('firebase/firestore'), import('@/services/firebase')]).then(
+      async ([{ doc, getDoc }, { db }]) => {
+        if (cancelled) return
+        const snap = await getDoc(doc(db, PROJECT_SETTINGS_DOC(projectId)))
+        if (cancelled) return
+        const data = snap.data()
+        setDwgTypeOptions(data?.dwgTypeOptions ?? [])
+        setDetailStatusOptions(data?.detailStatusOptions ?? [])
+      }
+    )
+
+    return () => { cancelled = true }
+  }, [projectId])
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dwgTypeRef.current && !dwgTypeRef.current.contains(event.target as Node)) setDwgTypeOpen(false)
+      if (detailStatusRef.current && !detailStatusRef.current.contains(event.target as Node)) setDetailStatusOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  async function saveOptions(nextDwgTypeOptions: string[], nextDetailStatusOptions: string[]) {
+    if (USE_MOCK) return
+    const [{ doc, setDoc }, { db }] = await Promise.all([
+      import('firebase/firestore'),
+      import('@/services/firebase'),
+    ])
+    await setDoc(doc(db, PROJECT_SETTINGS_DOC(projectId)), {
+      dwgTypeOptions: nextDwgTypeOptions,
+      detailStatusOptions: nextDetailStatusOptions,
+    }, { merge: true })
+  }
+
+  function addDwgType() {
+    const value = dwgTypeInput.trim()
+    if (!value || dwgTypeOptions.includes(value)) return
+    const next = [...dwgTypeOptions, value]
+    setDwgTypeOptions(next)
+    setDwgTypeInput('')
+    setForm((prev) => ({ ...prev, dwgType: value }))
+    void saveOptions(next, detailStatusOptions)
+  }
+
+  function removeDwgType(option: string) {
+    const next = dwgTypeOptions.filter((item) => item !== option)
+    setDwgTypeOptions(next)
+    if (form.dwgType === option) setForm((prev) => ({ ...prev, dwgType: '' }))
+    void saveOptions(next, detailStatusOptions)
+  }
+
+  function addDetailStatus() {
+    const value = detailStatusInput.trim()
+    if (!value || detailStatusOptions.includes(value)) return
+    const next = [...detailStatusOptions, value]
+    setDetailStatusOptions(next)
+    setDetailStatusInput('')
+    setForm((prev) => ({ ...prev, detailStatus: value }))
+    void saveOptions(dwgTypeOptions, next)
+  }
+
+  function removeDetailStatus(option: string) {
+    const next = detailStatusOptions.filter((item) => item !== option)
+    setDetailStatusOptions(next)
+    if (form.detailStatus === option) setForm((prev) => ({ ...prev, detailStatus: '' }))
+    void saveOptions(dwgTypeOptions, next)
+  }
 
   async function handleSave() {
     if (!form.documentNo.trim() || !form.title.trim()) {
@@ -101,6 +193,7 @@ export default function DocumentDetailModal({
         import('firebase/firestore'),
         import('@/services/firebase'),
       ])
+      const updatedAt = Timestamp.now()
       await updateDoc(doc(db, 'CMG-cdms-DocControl', 'root', 'documents', d.documentId), {
         documentNo: form.documentNo.trim(),
         title: form.title.trim(),
@@ -110,10 +203,28 @@ export default function DocumentDetailModal({
         statusCode: form.statusCode || null,
         reviewComment: form.reviewComment.trim(),
         transmittalId: form.transmittalId.trim(),
+        dwgType: form.dwgType.trim(),
+        detailStatus: form.detailStatus.trim(),
         fileUrls: form.fileUrls,
         updatedBy: currentUserUid,
-        updatedAt: Timestamp.now(),
+        updatedAt,
       })
+      setDocumentState((prev) => ({
+        ...prev,
+        documentNo: form.documentNo.trim(),
+        title: form.title.trim(),
+        revision: form.revision.trim() || 'Rev.00',
+        category: form.category,
+        status: form.status,
+        statusCode: form.statusCode ? form.statusCode as StatusCode : undefined,
+        reviewComment: form.reviewComment.trim(),
+        transmittalId: form.transmittalId.trim(),
+        dwgType: form.dwgType.trim(),
+        detailStatus: form.detailStatus.trim(),
+        fileUrls: form.fileUrls,
+        updatedBy: currentUserUid,
+        updatedAt,
+      }))
       setMode('view')
     } catch (err) {
       console.error('Update document failed:', err)
@@ -144,10 +255,10 @@ export default function DocumentDetailModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-2 min-w-0 flex-wrap">
-            <span className="font-mono text-sm font-semibold text-blue-700">{d.documentNo}</span>
-            <span className="font-mono text-xs text-gray-500">{d.revision}</span>
-            <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[d.status] ?? 'bg-gray-100 text-gray-600'}`}>
-              {d.status}
+            <span className="font-mono text-sm font-semibold text-blue-700">{documentState.documentNo}</span>
+            <span className="font-mono text-xs text-gray-500">{documentState.revision}</span>
+            <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[documentState.status] ?? 'bg-gray-100 text-gray-600'}`}>
+              {documentState.status}
             </span>
           </div>
           <div className="flex items-center gap-1 shrink-0 ml-2">
@@ -179,27 +290,29 @@ export default function DocumentDetailModal({
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {mode === 'view' ? (
             <div className="space-y-3 text-sm">
-              <Row label="Document No." value={d.documentNo} className="font-mono font-semibold text-blue-700" />
-              <Row label="Title" value={d.title} className="font-medium text-gray-900" />
+              <Row label="Document No." value={documentState.documentNo} className="font-mono font-semibold text-blue-700" />
+              <Row label="Title" value={documentState.title} className="font-medium text-gray-900" />
               <div className="flex items-center gap-2">
                 <span className="text-gray-500 w-32 shrink-0">Category</span>
-                <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${CATEGORY_COLORS[d.category] ?? 'bg-gray-100'}`}>
-                  {d.category}
+                <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${CATEGORY_COLORS[documentState.category] ?? 'bg-gray-100'}`}>
+                  {documentState.category}
                 </span>
               </div>
-              <Row label="Revision" value={d.revision} className="font-mono" />
-              {d.statusCode && (
+              <Row label="DWG Type" value={documentState.dwgType} />
+              <Row label="Detail Status" value={documentState.detailStatus} />
+              <Row label="Revision" value={documentState.revision} className="font-mono" />
+              {documentState.statusCode && (
                 <div className="flex items-center gap-2">
                   <span className="text-gray-500 w-32 shrink-0">Status Code</span>
-                  <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold ${STATUS_CODE_LABELS[d.statusCode]?.cls ?? 'bg-gray-100'}`}>
-                    {STATUS_CODE_LABELS[d.statusCode]?.label ?? d.statusCode}
+                  <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold ${STATUS_CODE_LABELS[documentState.statusCode]?.cls ?? 'bg-gray-100'}`}>
+                    {STATUS_CODE_LABELS[documentState.statusCode]?.label ?? documentState.statusCode}
                   </span>
                 </div>
               )}
-              {d.reviewComment && <Row label="Review Comment" value={d.reviewComment} />}
-              {d.transmittalId && <Row label="Transmittal ID" value={d.transmittalId} className="font-mono text-xs" />}
-              <Row label="Updated" value={new Date(d.updatedAt.seconds * 1000).toLocaleDateString('en-GB')} />
-              {!d.isLatest && (
+              {documentState.reviewComment && <Row label="Review Comment" value={documentState.reviewComment} />}
+              {documentState.transmittalId && <Row label="Transmittal ID" value={documentState.transmittalId} className="font-mono text-xs" />}
+              <Row label="Updated" value={new Date(documentState.updatedAt.seconds * 1000).toLocaleDateString('en-GB')} />
+              {!documentState.isLatest && (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-100 text-gray-500 text-xs">
                   ⚠️ Superseded — this is not the latest revision
                 </div>
@@ -261,6 +374,106 @@ export default function DocumentDetailModal({
                     <option value="">— None —</option>
                     {STATUS_CODES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-gray-700">DWG Type</label>
+                  <div ref={dwgTypeRef} className="relative">
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => setDwgTypeOpen((open) => !open)}
+                      className="w-full h-9 text-sm border border-gray-200 rounded-md px-2 pr-8 bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between disabled:opacity-50"
+                    >
+                      <span className={form.dwgType ? 'text-gray-800' : 'text-gray-400'}>{form.dwgType || 'Select...'}</span>
+                      <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                    </button>
+                    {dwgTypeOpen && (
+                      <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+                        {dwgTypeOptions.length === 0 && <p className="px-3 py-2 text-xs text-gray-400">No options yet. Add below.</p>}
+                        {dwgTypeOptions.map((option) => (
+                          <div key={option} className="flex items-center justify-between px-3 py-1.5 hover:bg-gray-50 group">
+                            <button
+                              type="button"
+                              onClick={() => { setForm((prev) => ({ ...prev, dwgType: option })); setDwgTypeOpen(false) }}
+                              className={['flex-1 text-left text-sm', form.dwgType === option ? 'font-semibold text-blue-600' : 'text-gray-700'].join(' ')}
+                            >
+                              {option}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeDwgType(option)}
+                              className="ml-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Remove option"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                        <div className="flex items-center gap-1 px-3 pt-2 pb-1 border-t border-gray-100 mt-1">
+                          <input
+                            value={dwgTypeInput}
+                            onChange={(e) => setDwgTypeInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addDwgType())}
+                            placeholder="New option..."
+                            className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          />
+                          <button type="button" onClick={addDwgType} className="p-1 rounded bg-blue-600 text-white hover:bg-blue-700" title="Add option">
+                            <Plus size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-gray-700">Detail Status</label>
+                  <div ref={detailStatusRef} className="relative">
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => setDetailStatusOpen((open) => !open)}
+                      className="w-full h-9 text-sm border border-gray-200 rounded-md px-2 pr-8 bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between disabled:opacity-50"
+                    >
+                      <span className={form.detailStatus ? 'text-gray-800' : 'text-gray-400'}>{form.detailStatus || 'Select...'}</span>
+                      <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                    </button>
+                    {detailStatusOpen && (
+                      <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+                        {detailStatusOptions.length === 0 && <p className="px-3 py-2 text-xs text-gray-400">No options yet. Add below.</p>}
+                        {detailStatusOptions.map((option) => (
+                          <div key={option} className="flex items-center justify-between px-3 py-1.5 hover:bg-gray-50 group">
+                            <button
+                              type="button"
+                              onClick={() => { setForm((prev) => ({ ...prev, detailStatus: option })); setDetailStatusOpen(false) }}
+                              className={['flex-1 text-left text-sm', form.detailStatus === option ? 'font-semibold text-emerald-600' : 'text-gray-700'].join(' ')}
+                            >
+                              {option}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeDetailStatus(option)}
+                              className="ml-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Remove option"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                        <div className="flex items-center gap-1 px-3 pt-2 pb-1 border-t border-gray-100 mt-1">
+                          <input
+                            value={detailStatusInput}
+                            onChange={(e) => setDetailStatusInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addDetailStatus())}
+                            placeholder="New option..."
+                            className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                          />
+                          <button type="button" onClick={addDetailStatus} className="p-1 rounded bg-emerald-600 text-white hover:bg-emerald-700" title="Add option">
+                            <Plus size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-gray-700">Transmittal ID</label>
